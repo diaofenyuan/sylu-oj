@@ -1,0 +1,44 @@
+# usr.bin.judge-agent —— 判题区 Judge Agent（Task 3）
+# 非 root 的 judge 用户运行；无入站任务管理端口；仅经 mTLS 主动拉取任务；
+# 显式禁止密钥目录、其他服务数据、宿主机目录与 Docker Socket（设计 6.2 / 7.1）。
+#include <tunables/global>
+
+/usr/bin/judge-agent {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/openssl>
+
+  # 仅出站连接 Judge Gateway（内网 mTLS，虚拟防火墙限定 8443）
+  network inet stream,
+  network inet6 stream,
+
+  # Agent 制品与语言策略只读
+  /opt/oj/judge/** r,
+
+  # 沙箱临时写层与结果回传（vsock / Unix Socket）
+  /var/lib/oj/judge/** rw,
+  /run/oj-judge/** rw,
+
+  # 日志
+  /var/log/oj/** w,
+
+  # ---- 强制 deny：判题边界核心（设计 6.2 / 7.1 第 2 条）----
+  # 密钥目录
+  deny /etc/oj/secrets/** rwklx,
+  deny /etc/oj/credentials/** rwklx,
+  # 其他服务数据
+  deny /var/lib/oj/data/** rwklx,
+  deny /var/lib/mysql/** rwklx,
+  deny /var/lib/redis/** rwklx,
+  deny /var/lib/rabbitmq/** rwklx,
+  # 宿主机目录
+  deny /mnt/** rwklx,
+  deny /media/** rwklx,
+  deny /srv/** rwklx,
+  deny /home/** rwklx,
+  # Docker Socket（禁止容器逃逸宿主）
+  deny /var/run/docker.sock rw,
+  deny /run/docker.sock rw,
+
+  /tmp/** rw,
+}

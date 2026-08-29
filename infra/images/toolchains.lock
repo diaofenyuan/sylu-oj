@@ -1,0 +1,20 @@
+# toolchains.lock —— 固定工具链版本与校验和（Task 3）
+#
+# 依据设计文档第 7 节「基础镜像固定版本和摘要」与第 12.2 节「构建过程不得把
+# 未锁定版本的依赖拉入发布包」。本文件由 CI 在每次版本化发布时锁定并校验，
+# 任何变更必须随发布包升级，禁止运行时动态安装或升级。
+#
+# 格式：<name>  <version>  <sha256>
+# sha256 为对应 .deb / 制品文件的校验和，占位符 TODO 由 CI 替换为真实值，
+# 未替换的占位符在 release-integrity 验收中视为失败。
+
+gcc-11                  11.4.0-1ubuntu1~22.04        TODO:ci-lock-sha256
+g++-11                  11.4.0-1ubuntu1~22.04        TODO:ci-lock-sha256
+libc6-dev               2.35-0ubuntu3.8              TODO:ci-lock-sha256
+python3                 3.10.12-1~22.04.3            TODO:ci-lock-sha256
+openjdk-17-jdk-headless 17.0.12+7-1~22.04.1          TODO:ci-lock-sha256
+libseccomp2             2.5.3-2ubuntu2               TODO:ci-lock-sha256
+firecracker             1.7.0                        TODO:ci-lock-sha256
+runsc (gVisor)          release-20240805.0           TODO:ci-lock-sha256
+nginx                   1.18.0-6ubuntu14.5           TODO:ci-lock-sha256
+libnginx-mod-security   1.0.2-3ubuntu1               TODO:ci-lock-sha256

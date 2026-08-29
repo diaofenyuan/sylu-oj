@@ -1,0 +1,28 @@
+# usr.sbin.redis-server —— 数据区 Redis（Task 3）
+#include <tunables/global>
+
+/usr/sbin/redis-server {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/openssl>
+
+  capability setgid,
+  capability setuid,
+
+  # 仅监听内网 TLS（API VM 源地址，虚拟防火墙限定 6379），禁止公网监听
+  network inet stream,
+
+  /etc/redis/** r,
+  /var/lib/redis/** rw,
+  /var/log/redis/** w,
+  /run/redis/** rw,
+
+  # 禁止触碰应用密钥与其他服务数据
+  deny /etc/oj/secrets/** rwklx,
+  deny /etc/oj/credentials/** rwklx,
+  deny /var/lib/mysql/** rwklx,
+  deny /var/lib/rabbitmq/** rwklx,
+  deny /var/run/docker.sock rw,
+
+  /tmp/** rw,
+}

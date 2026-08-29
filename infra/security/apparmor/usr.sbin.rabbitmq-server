@@ -1,0 +1,29 @@
+# usr.sbin.rabbitmq-server —— 数据区 RabbitMQ（Task 3）
+# 管理插件仅监听本机回环（虚拟防火墙限定 5671 AMQP over TLS，禁止公网）。
+#include <tunables/global>
+
+/usr/sbin/rabbitmq-server {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/openssl>
+
+  capability setgid,
+  capability setuid,
+
+  # AMQP over TLS 内网监听；管理插件仅回环（lo）
+  network inet stream,
+
+  /etc/rabbitmq/** r,
+  /var/lib/rabbitmq/** rw,
+  /var/log/rabbitmq/** w,
+  /run/rabbitmq/** rw,
+
+  # 禁止触碰应用密钥与其他服务数据
+  deny /etc/oj/secrets/** rwklx,
+  deny /etc/oj/credentials/** rwklx,
+  deny /var/lib/mysql/** rwklx,
+  deny /var/lib/redis/** rwklx,
+  deny /var/run/docker.sock rw,
+
+  /tmp/** rw,
+}

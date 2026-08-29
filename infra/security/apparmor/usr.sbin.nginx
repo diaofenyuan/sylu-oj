@@ -1,0 +1,41 @@
+# usr.sbin.nginx —— Ingress / Web 区 Nginx（Task 3）
+# 先 complain 回归、审读拒绝记录后由 install-apparmor.sh 切换到 Enforce。
+#include <tunables/global>
+
+/usr/sbin/nginx {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/openssl>
+
+  # 绑定 80/443/8443/8080（8443 为入口 mTLS，8080 为 Web 区静态资源）
+  capability net_bind_service,
+  capability setgid,
+  capability setuid,
+
+  # 配置文件与运行目录只读
+  /etc/nginx/** r,
+  /etc/ssl/** r,
+
+  # TLS 私钥经 systemd LoadCredential 注入 /run/oj-ingress/cred（只读）
+  /run/oj-ingress/cred/** r,
+
+  # 静态资源只读
+  /var/www/oj/dist/** r,
+
+  # 日志与临时目录写
+  /var/log/nginx/** w,
+  /var/log/oj/** w,
+  /var/run/nginx.pid w,
+  /run/nginx.pid w,
+  /run/nginx/ w,
+
+  # 禁止 Nginx 触碰业务数据、密钥与宿主机目录（纵深防御）
+  deny /etc/oj/secrets/** rwklx,
+  deny /etc/oj/credentials/** rwklx,
+  deny /var/lib/oj/** rwklx,
+  deny /var/lib/mysql/** rwklx,
+  deny /var/run/docker.sock rw,
+  deny /run/docker.sock rw,
+
+  /tmp/** rw,
+}

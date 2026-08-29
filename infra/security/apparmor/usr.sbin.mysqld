@@ -1,0 +1,31 @@
+# usr.sbin.mysqld —— 数据区 MySQL（Task 3）
+#include <tunables/global>
+
+/usr/sbin/mysqld {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/openssl>
+
+  capability dac_override,
+  capability setgid,
+  capability setuid,
+  capability sys_resource,
+
+  # 仅监听内网 TLS（API VM 源地址，虚拟防火墙限定 3306）
+  network inet stream,
+
+  /etc/mysql/** r,
+  /var/lib/mysql/** rw,
+  /var/log/mysql/** w,
+  /var/run/mysqld/** rw,
+  /run/mysqld/** rw,
+
+  # 禁止触碰应用密钥与其他服务数据
+  deny /etc/oj/secrets/** rwklx,
+  deny /etc/oj/credentials/** rwklx,
+  deny /var/lib/redis/** rwklx,
+  deny /var/lib/rabbitmq/** rwklx,
+  deny /var/run/docker.sock rw,
+
+  /tmp/** rw,
+}

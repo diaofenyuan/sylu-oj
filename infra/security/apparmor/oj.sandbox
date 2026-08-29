@@ -1,0 +1,52 @@
+# oj.sandbox —— 判题 MicroVM/容器内沙箱进程（Task 3）
+# 最严格约束：无网卡/路由/DNS、只读根文件系统、临时写层、no_new_privs、能力清零、
+# seccomp 白名单（见 judge/sandbox/seccomp.json）与 cgroups v2 配额共同生效。
+# 本 profile 是 AppArmor 层对沙箱内用户程序与编译进程的统一约束。
+#include <tunables/global>
+
+profile oj.sandbox {
+  #include <abstractions/base>
+
+  # 沙箱进程禁止一切网络（判题 MicroVM 无网卡，运行态网络完全拒绝）
+  deny network inet,
+  deny network inet6,
+  deny network unix,
+  deny network raw,
+  deny network packet,
+  deny network netlink,
+
+  # 能力清零（与 no_new_privs、能力删除一致）
+  deny capability,
+
+  # 只读根 + 仅允许临时写层（由 Agent 挂载的 overlay/tmpfs）
+  / r,
+  /bin/** mr,
+  /usr/** mr,
+  /lib/** mr,
+  /lib64/** mr,
+  /tmp/** rw,
+  /sandbox/** rw,
+
+  # 编译与运行产物写（受限）
+  /judge/work/** rw,
+
+  # ---- 强制 deny：核心资产与基础设施 ----
+  # 密钥目录
+  deny /etc/oj/secrets/** rwklx,
+  deny /etc/oj/credentials/** rwklx,
+  # 其他服务数据 / 隐藏测试数据明文
+  deny /var/lib/oj/data/** rwklx,
+  deny /var/lib/mysql/** rwklx,
+  deny /var/lib/redis/** rwklx,
+  deny /var/lib/rabbitmq/** rwklx,
+  # 宿主机目录与 /proc /sys
+  deny /proc/** rwklx,
+  deny /sys/** rwklx,
+  deny /mnt/** rwklx,
+  deny /media/** rwklx,
+  deny /srv/** rwklx,
+  deny /home/** rwklx,
+  # Docker Socket（禁止逃逸宿主）
+  deny /var/run/docker.sock rw,
+  deny /run/docker.sock rw,
+}
