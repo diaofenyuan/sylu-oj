@@ -1,0 +1,10 @@
+<!--
+  oj-data.xml —— 数据区隔离二层网络
+  子网：10.20.3.0/24；网关 10.20.3.1 由虚拟防火墙 VM 持有。
+  数据区承载 MySQL、Redis、RabbitMQ，无公网入口，仅接受 API 的指定 TLS 连接。
+-->
+<network>
+  <name>oj-data</name>
+  <bridge name='virbr-oj-data' stp='on' delay='0'/>
+  <forward mode='none'/>
+</network>

@@ -1,0 +1,98 @@
+#!/usr/sbin/nft -f
+# infra/libvirt/firewall/virtual-firewall.nft —— 虚拟防火墙 VM 规则集（Task 2）
+#
+# 实现设计文档第 3 节「防火墙与访问控制矩阵」：默认拒绝 + 分区路由。
+# 由 install.sh 部署到 oj-fw 来宾内部；本文件不含任何真实 IP/凭据，占位符上线前确认。
+#
+# 接口约定（oj-fw 来宾）：
+#   eth0 = uplink（校园网/VPN 入口）
+#   eth1 = dmz 10.20.0.0/24   eth2 = web 10.20.1.0/24   eth3 = api 10.20.2.0/24
+#   eth4 = data 10.20.3.0/24  eth5 = judge 10.20.4.0/24  eth6 = ops 10.20.5.0/24
+
+flush ruleset
+
+# --- 占位符：上线前由网络管理员确认 ---
+define campus_cidr = 10.0.0.0/8           # TODO: 校园网 CIDR（校内直连来源）
+define vpn_pool    = 172.16.0.0/12        # TODO: 学校 VPN 地址池
+define mgmt_src    = { 192.0.2.10 }       # TODO: 中转机/明确管理源地址
+define ntp_srv     = { 10.0.0.1, 10.0.0.2 } # TODO: 校内 NTP 多源
+define upd_srv     = { 192.0.2.20 }       # TODO: 受控更新源（经 OPS 代理，维护窗口 443）
+
+# --- 六域来宾地址 ---
+define INGRESS_IP = 10.20.0.10
+define WEB_IP     = 10.20.1.10
+define API_IP     = 10.20.2.10
+define DATA_IP    = 10.20.3.10
+define JUDGE_IP   = 10.20.4.10
+define OPS_IP     = 10.20.5.10
+
+table inet fw {
+
+  set campus_src {
+    type ipv4_addr
+    flags interval
+    elements = { $campus_cidr, $vpn_pool }
+  }
+
+  # --- 保护防火墙自身 ---
+  chain input {
+    type filter hook input priority filter; policy drop;
+    iif "lo" accept
+    ct state established,related accept
+    ct state invalid drop
+    tcp dport 22 ip saddr $mgmt_src accept   # 仅管理源可 SSH 防火墙本身
+    counter drop
+  }
+
+  # --- 出向（防火墙自身） ---
+  chain output {
+    type filter hook output priority filter; policy drop;
+    oif "lo" accept
+    ct state established,related accept
+    udp dport 123 ip daddr $ntp_srv accept
+    counter drop
+  }
+
+  # --- 分区路由与端口矩阵（默认拒绝） ---
+  chain forward {
+    type filter hook forward priority filter; policy drop;
+    ct state established,related accept
+    ct state invalid drop
+
+    # [1] 校园网/VPN -> 入口 DMZ TCP 443（唯一外部可达端口，源地址限定）
+    iifname "eth0" ip saddr @campus_src ip daddr $INGRESS_IP tcp dport 443 accept
+
+    # [2] DMZ -> WEB TCP 8080（Vue 静态资源反向代理）
+    ip saddr $INGRESS_IP ip daddr $WEB_IP tcp dport 8080 accept
+
+    # [3] DMZ -> API TCP 8443（Web API 转发，内部 mTLS）
+    ip saddr $INGRESS_IP ip daddr $API_IP tcp dport 8443 accept
+
+    # [4] API -> DATA：MySQL 3306 / Redis 6379 / RabbitMQ 5671（TLS、最小权限账户）
+    ip saddr $API_IP ip daddr $DATA_IP tcp dport 3306 accept
+    ip saddr $API_IP ip daddr $DATA_IP tcp dport 6379 accept
+    ip saddr $API_IP ip daddr $DATA_IP tcp dport 5671 accept
+
+    # [5] JUDGE -> API（Judge Gateway）TCP 8443（Agent 经 mTLS 主动拉取，无入站管理端口）
+    ip saddr $JUDGE_IP ip daddr $API_IP tcp dport 8443 accept
+
+    # [6] 业务 VM -> OPS：TLS Syslog 6514（日志）；OPS -> VM：指标采集 9100
+    ip daddr $OPS_IP tcp dport 6514 accept
+    ip saddr $OPS_IP tcp dport 9100 accept
+
+    # [7] 管理来源（中转机）-> 各 VM SSH 22（密钥认证，无堡垒机时 auditd/sudo 补偿）
+    ip saddr $mgmt_src ip daddr { $INGRESS_IP, $WEB_IP, $API_IP, $DATA_IP, $JUDGE_IP, $OPS_IP } tcp dport 22 accept
+
+    # [8] DATA -> 备份仓库 TCP 443（加密备份推送，mTLS，仅写入仓库身份）
+    ip saddr $DATA_IP ip daddr $upd_srv tcp dport 443 accept
+
+    # [9] 各 VM -> 校内 NTP UDP 123（多源交叉校验）
+    oifname "eth0" udp dport 123 ip daddr $ntp_srv accept
+
+    # [10] 维护窗口：OPS -> 受控更新源 TCP 443（唯一允许的运行时出网）
+    ip saddr $OPS_IP ip daddr $upd_srv tcp dport 443 accept
+
+    # 默认拒绝：SSH/MySQL/Redis/RabbitMQ/Prometheus/Grafana/Runner 等一律不可从校园网/VPN 直达
+    counter drop
+  }
+}

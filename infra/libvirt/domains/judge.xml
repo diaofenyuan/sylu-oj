@@ -1,0 +1,55 @@
+<!--
+  judge.xml —— 判题区 VM 定义
+  用途：Judge Agent + 沙箱启动器（Firecracker MicroVM / gVisor 降级）。
+  安全要点（关键）：
+    - 使用 <cpu mode='host-passthrough'/> 使 guest 可见 VMX/SVM，支持嵌套虚拟化（设计 6.1）；
+    - 无入站任务管理端口，Agent 经 mTLS 主动拉取任务；
+    - 内存配额 48 GiB 需扣除 Agent 常驻与系统开销后再分配沙箱池，压测后确定并发上限。
+-->
+<domain type='kvm'>
+  <name>oj-judge</name>
+  <uuid></uuid>
+  <memory unit='GiB'>48</memory>
+  <vcpu placement='static'>16</vcpu>
+
+  <os>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+
+  <!-- 嵌套虚拟化前提：guest 必须可见 VMX/SVM（设计 6.1），不可用则降级 gVisor -->
+  <cpu mode='host-passthrough'>
+    <topology sockets='1' dies='1' cores='16' threads='1'/>
+  </cpu>
+
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/oj-judge.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <interface type='network'>
+      <source network='oj-judge'/>
+      <model type='virtio'/>
+    </interface>
+    <serial type='pty'><target port='0'/></serial>
+    <console type='pty'><target type='serial' port='0'/></console>
+    <rng model='virtio'><backend model='random'>/dev/urandom</backend></rng>
+  </devices>
+</domain>

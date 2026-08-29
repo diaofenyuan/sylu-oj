@@ -1,0 +1,10 @@
+<!--
+  oj-web.xml —— Web 区隔离二层网络
+  子网：10.20.1.0/24；网关 10.20.1.1 由虚拟防火墙 VM 持有。
+  Web 区仅提供 Vue 静态资源，仅接收入口区反代请求。
+-->
+<network>
+  <name>oj-web</name>
+  <bridge name='virbr-oj-web' stp='on' delay='0'/>
+  <forward mode='none'/>
+</network>

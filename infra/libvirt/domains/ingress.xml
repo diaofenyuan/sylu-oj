@@ -1,0 +1,49 @@
+<!--
+  ingress.xml —— 入口区（DMZ）VM 定义
+  用途：Nginx + Coraza/ModSecurity WAF + L7 负载均衡（唯一接受校园网与 VPN 来源 HTTPS 的区域）。
+  安全要点：不存业务数据/数据库凭据/JWT 私钥；TLS 私钥受 ProtectSystem=strict 与只读挂载保护。
+-->
+<domain type='kvm'>
+  <name>oj-ingress</name>
+  <uuid></uuid>
+  <memory unit='GiB'>2</memory>
+  <vcpu placement='static'>2</vcpu>
+
+  <os>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+
+  <cpu mode='host-model'/>
+
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/oj-ingress.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+    <interface type='network'>
+      <source network='oj-dmz'/>
+      <model type='virtio'/>
+    </interface>
+    <serial type='pty'><target port='0'/></serial>
+    <console type='pty'><target type='serial' port='0'/></console>
+    <rng model='virtio'><backend model='random'>/dev/urandom</backend></rng>
+  </devices>
+</domain>

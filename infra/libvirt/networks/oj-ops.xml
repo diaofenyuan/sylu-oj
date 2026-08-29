@@ -1,0 +1,10 @@
+<!--
+  oj-ops.xml —— 运维区隔离二层网络
+  子网：10.20.5.0/24；网关 10.20.5.1 由虚拟防火墙 VM 持有。
+  运维区承载 Prometheus、Alertmanager、集中日志与同机备份工具，仅中转机/明确管理源可达。
+-->
+<network>
+  <name>oj-ops</name>
+  <bridge name='virbr-oj-ops' stp='on' delay='0'/>
+  <forward mode='none'/>
+</network>

@@ -1,0 +1,10 @@
+<!--
+  oj-judge.xml —— 判题区隔离二层网络
+  子网：10.20.4.0/24；网关 10.20.4.1 由虚拟防火墙 VM 持有。
+  判题区承载 Judge Agent 与沙箱启动器，无入站任务管理端口，Agent 经 mTLS 主动拉取任务。
+-->
+<network>
+  <name>oj-judge</name>
+  <bridge name='virbr-oj-judge' stp='on' delay='0'/>
+  <forward mode='none'/>
+</network>

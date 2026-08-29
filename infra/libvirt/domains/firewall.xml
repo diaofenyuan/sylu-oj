@@ -1,0 +1,60 @@
+<!--
+  firewall.xml —— 虚拟防火墙 VM 定义
+  用途：连接 DMZ/WEB/API/DATA/JUDGE/OPS 六个安全域与校园网入口，默认拒绝、分区路由，
+        实现设计文档第 3 节的端口矩阵（规则集见 infra/libvirt/firewall/virtual-firewall.nft）。
+  注意：uplink 接口接入校园网的物理 NIC（macvtap direct 或宿主机网桥，按真实网络选择）。
+-->
+<domain type='kvm'>
+  <name>oj-fw</name>
+  <uuid></uuid>
+  <memory unit='GiB'>1</memory>
+  <vcpu placement='static'>2</vcpu>
+
+  <os>
+    <type arch='x86_64' machine='q35'>hvm</type>
+    <boot dev='hd'/>
+  </os>
+
+  <features>
+    <acpi/>
+    <apic/>
+  </features>
+
+  <cpu mode='host-model'/>
+
+  <clock offset='utc'>
+    <timer name='rtc' tickpolicy='catchup'/>
+    <timer name='pit' tickpolicy='delay'/>
+    <timer name='hpet' present='no'/>
+  </clock>
+
+  <on_poweroff>destroy</on_poweroff>
+  <on_reboot>restart</on_reboot>
+  <on_crash>destroy</on_crash>
+
+  <devices>
+    <emulator>/usr/bin/qemu-system-x86_64</emulator>
+    <disk type='file' device='disk'>
+      <driver name='qemu' type='qcow2'/>
+      <source file='/var/lib/libvirt/images/oj-fw.qcow2'/>
+      <target dev='vda' bus='virtio'/>
+    </disk>
+
+    <!-- 校园网入口 uplink：接入物理 NIC（macvtap 或网桥按实际网络二选一） -->
+    <interface type='direct'>
+      <source dev='enp1s0' mode='bridge'/>
+      <model type='virtio'/>
+    </interface>
+
+    <interface type='network'><source network='oj-dmz'/><model type='virtio'/></interface>
+    <interface type='network'><source network='oj-web'/><model type='virtio'/></interface>
+    <interface type='network'><source network='oj-api'/><model type='virtio'/></interface>
+    <interface type='network'><source network='oj-data'/><model type='virtio'/></interface>
+    <interface type='network'><source network='oj-judge'/><model type='virtio'/></interface>
+    <interface type='network'><source network='oj-ops'/><model type='virtio'/></interface>
+
+    <serial type='pty'><target port='0'/></serial>
+    <console type='pty'><target type='serial' port='0'/></console>
+    <rng model='virtio'><backend model='random'>/dev/urandom</backend></rng>
+  </devices>
+</domain>
