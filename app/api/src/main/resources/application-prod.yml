@@ -12,6 +12,21 @@ spring:
 oj:
   auth:
     local-accounts-enabled: false
+  identity:
+    education:
+      enabled: true
+      provider: jxw
+      # 独占模式：禁用本地合成登录路径，教务不可用即拒绝新登录，无任何降级
+      enforce-exclusive: true
+      # 管理员教务工号名单（逗号分隔），经部署环境注入
+      admin-staff-numbers: ${OJ_ADMIN_STAFF_NUMBERS:}
+      jxw:
+        # 现场验收并登记责任人后置 true（见 docs/runbooks/education-login-adapter.md）
+        certified: ${OJ_JXW_CERTIFIED:false}
+    # 回调地址必须与入口 HTTPS 精确一致，经部署环境注入
+    callback-whitelist: ${OJ_LOGIN_CALLBACK_URL:}
+    cookie-secure: true
+    totp-encryption-key: ${OJ_TOTP_ENCRYPTION_KEY}
   dev-internal-api:
     enabled: false
   export:

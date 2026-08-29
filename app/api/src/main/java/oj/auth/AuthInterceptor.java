@@ -9,11 +9,22 @@ import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.HandlerInterceptor;
 
+import java.util.Set;
+
 /**
  * 认证拦截器：Bearer 令牌解析；/internal/** 使用独立的内部令牌。
+ * 教务适配器登录入口与刷新/绑定端点匿名（见 oj.identity，一次性令牌或 Cookie 校验）。
  */
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
+
+    private static final Set<String> ANONYMOUS_PATHS = Set.of(
+            "/api/identity/login/start",
+            "/api/identity/login/callback",
+            "/api/identity/login/proxy-submitted",
+            "/api/identity/refresh",
+            "/api/identity/totp/enroll",
+            "/api/identity/totp/confirm");
 
     private final LocalAccountService localAccountService;
     private final boolean internalApiEnabled;
@@ -45,6 +56,9 @@ public class AuthInterceptor implements HandlerInterceptor {
         }
         // 登录接口匿名
         if ("POST".equalsIgnoreCase(request.getMethod()) && path.equals("/api/auth/login")) {
+            return true;
+        }
+        if (ANONYMOUS_PATHS.contains(path)) {
             return true;
         }
         String header = request.getHeader("Authorization");

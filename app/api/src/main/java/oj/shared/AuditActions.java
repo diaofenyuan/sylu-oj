@@ -52,4 +52,28 @@ public final class AuditActions {
     public static final String LOGIN_FAILED = "LOGIN_FAILED";
     public static final String LOGOUT = "LOGOUT";
     public static final String LOCAL_ACCOUNT_CREATED = "LOCAL_ACCOUNT_CREATED";
+
+    // 教务网页登录适配器与会话（Task 5）
+    public static final String IDENTITY_LOGIN_START = "IDENTITY_LOGIN_START";
+    public static final String IDENTITY_LOGIN_SUCCESS = "IDENTITY_LOGIN_SUCCESS";
+    public static final String IDENTITY_LOGIN_FAILED = "IDENTITY_LOGIN_FAILED";
+    public static final String LOGIN_STATE_REPLAY_REJECTED = "LOGIN_STATE_REPLAY_REJECTED";
+    public static final String LOGIN_TICKET_REPLAY_REJECTED = "LOGIN_TICKET_REPLAY_REJECTED";
+    public static final String ADAPTER_PAGE_CHANGED = "ADAPTER_PAGE_CHANGED";
+    public static final String ADAPTER_CAPTCHA_DETECTED = "ADAPTER_CAPTCHA_DETECTED";
+    public static final String ADAPTER_HALTED = "ADAPTER_HALTED";
+    public static final String ADAPTER_RESUMED = "ADAPTER_RESUMED";
+    public static final String IDENTITY_CHANGE_DETECTED = "IDENTITY_CHANGE_DETECTED";
+    public static final String IDENTITY_CONFIRMED = "IDENTITY_CONFIRMED";
+    public static final String IDENTITY_DISABLED = "IDENTITY_DISABLED";
+    public static final String IDENTITY_BOUND = "IDENTITY_BOUND";
+    public static final String REFRESH_ROTATED = "REFRESH_ROTATED";
+    public static final String REFRESH_REUSE_DETECTED = "REFRESH_REUSE_DETECTED";
+    public static final String SESSIONS_REVOKED = "SESSIONS_REVOKED";
+    public static final String MFA_ENROLLED = "MFA_ENROLLED";
+    public static final String MFA_CONFIRMED = "MFA_CONFIRMED";
+    public static final String MFA_FAILED = "MFA_FAILED";
+    public static final String LOGIN_THROTTLED = "LOGIN_THROTTLED";
+    public static final String LOGIN_LOCKED = "LOGIN_LOCKED";
+    public static final String SESSION_ANOMALY = "SESSION_ANOMALY";
 }

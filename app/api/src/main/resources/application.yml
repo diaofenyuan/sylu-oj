@@ -23,9 +23,33 @@ server:
 
 oj:
   auth:
-    # 生产环境禁止本地合成账号：Task 5 的教务网页登录适配器上线后此开关保持 false。
+    # 生产环境禁止本地合成账号：教务网页登录适配器（Task 5）为生产唯一登录路径。
     local-accounts-enabled: false
     token-ttl-minutes: 720
+  identity:
+    # Access Token 10 分钟；刷新令牌单次轮换、可撤销（HttpOnly Cookie）
+    access-token-ttl-minutes: 10
+    refresh-token-ttl-hours: 12
+    state-ttl-minutes: 5
+    ticket-retention-minutes: 60
+    enrollment-ttl-minutes: 30
+    max-concurrent-sessions: 8
+    cookie-secure: true
+    cookie-same-site: Lax
+    # 精确回调白名单（逗号分隔，禁止通配/前缀匹配），由部署环境注入
+    callback-whitelist: ""
+    # TOTP 密钥加密用 32 字节（64 位十六进制），生产经 systemd 凭据注入
+    totp-encryption-key: ""
+    education:
+      enabled: false
+      provider: simulated
+      # true 时本地合成账号登录路径整体禁用（生产），教务不可用即拒绝新登录，无降级
+      enforce-exclusive: false
+      admin-staff-numbers: ""
+      jxw:
+        login-url: https://jxw.sylu.edu.cn/xtgl/login_slogin.html
+        # 现场验收并登记责任人后由部署配置置 true，否则适配器拒绝服务
+        certified: false
   export:
     dir: /var/lib/oj/exports
     token-ttl-minutes: 30

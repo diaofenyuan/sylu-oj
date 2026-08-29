@@ -1,5 +1,6 @@
 # 开发/内测环境（Windows）：H2 内存数据库（MySQL 兼容模式）+ OJ 合成账号。
 # 该环境不作为生产安全验收依据，仅用于功能联调。
+# 教务适配器使用模拟器（simulated）：只接受合成学号/工号，不接触真实密码。
 spring:
   datasource:
     url: jdbc:h2:file:./var/oj-dev;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=TRUE
@@ -20,6 +21,16 @@ oj:
       login: devadmin
       # 为空时启动阶段生成随机密码并写入日志一次，不落盘到仓库。
       password: ${OJ_DEV_ADMIN_PASSWORD:}
+  identity:
+    education:
+      enabled: true
+      provider: simulated
+      # 内测保留合成账号并行可用；生产（prod profile）为 true
+      enforce-exclusive: false
+      admin-staff-numbers: ADM-0001
+    callback-whitelist: http://localhost:8080/api/identity/login/callback
+    cookie-secure: false
+    totp-encryption-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
   dev-internal-api:
     enabled: true
     token: ${OJ_DEV_INTERNAL_TOKEN:dev-internal-only}

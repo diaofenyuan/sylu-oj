@@ -37,6 +37,7 @@ public class LocalAccountService {
     private final AuthTokenRepository authTokenRepository;
     private final AuditService auditService;
     private final boolean localAccountsEnabled;
+    private final boolean educationExclusive;
     private final String bootstrapAdminLogin;
     private final String bootstrapAdminPassword;
     private final long tokenTtlMinutes;
@@ -45,6 +46,7 @@ public class LocalAccountService {
                                AuthTokenRepository authTokenRepository,
                                AuditService auditService,
                                @Value("${oj.auth.local-accounts-enabled:false}") boolean localAccountsEnabled,
+                               @Value("${oj.identity.education.enforce-exclusive:false}") boolean educationExclusive,
                                @Value("${oj.auth.bootstrap-admin.login:}") String bootstrapAdminLogin,
                                @Value("${oj.auth.bootstrap-admin.password:}") String bootstrapAdminPassword,
                                @Value("${oj.auth.token-ttl-minutes:720}") long tokenTtlMinutes) {
@@ -52,6 +54,7 @@ public class LocalAccountService {
         this.authTokenRepository = authTokenRepository;
         this.auditService = auditService;
         this.localAccountsEnabled = localAccountsEnabled;
+        this.educationExclusive = educationExclusive;
         this.bootstrapAdminLogin = bootstrapAdminLogin;
         this.bootstrapAdminPassword = bootstrapAdminPassword;
         this.tokenTtlMinutes = tokenTtlMinutes;
@@ -136,7 +139,8 @@ public class LocalAccountService {
     }
 
     private void requireLocalAccountsEnabled() {
-        if (!localAccountsEnabled) {
+        // 教务适配器独占模式（生产）：禁止任何本地密码/合成账号降级路径
+        if (educationExclusive || !localAccountsEnabled) {
             throw new ApiException(ErrorCode.LOCAL_ACCOUNTS_DISABLED);
         }
     }
