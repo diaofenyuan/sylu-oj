@@ -14,3 +14,17 @@ Desktop.ini
 # 前导斜杠表示仅匹配仓库根目录，避免误伤 tests/docs/ 下的测试脚本。
 /docs/
 /plan/
+
+# Java / Maven
+target/
+*.class
+
+# Node
+node_modules/
+dist/
+*.log
+
+# 运行时本地数据与导出临时目录
+var/
+app/api/var/
+test-results/

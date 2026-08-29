@@ -1,0 +1,39 @@
+spring:
+  application:
+    name: oj-api
+  profiles:
+    default: prod
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: false
+
+server:
+  port: 8443
+  error:
+    include-stacktrace: never
+    include-message: never
+
+oj:
+  auth:
+    # 生产环境禁止本地合成账号：Task 5 的教务网页登录适配器上线后此开关保持 false。
+    local-accounts-enabled: false
+    token-ttl-minutes: 720
+  export:
+    dir: /var/lib/oj/exports
+    token-ttl-minutes: 30
+    file-retention-hours: 24
+  dev-internal-api:
+    enabled: false
+    token: ""
+  submission:
+    max-code-bytes: 262144
+  pagination:
+    max-page-size: 100

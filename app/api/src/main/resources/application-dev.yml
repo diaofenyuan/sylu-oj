@@ -1,0 +1,31 @@
+# 开发/内测环境（Windows）：H2 内存数据库（MySQL 兼容模式）+ OJ 合成账号。
+# 该环境不作为生产安全验收依据，仅用于功能联调。
+spring:
+  datasource:
+    url: jdbc:h2:file:./var/oj-dev;MODE=MySQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE;AUTO_SERVER=TRUE
+    driver-class-name: org.h2.Driver
+    username: oj
+    password: oj-dev-local
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+server:
+  port: 8080
+
+oj:
+  auth:
+    local-accounts-enabled: true
+    bootstrap-admin:
+      login: devadmin
+      # 为空时启动阶段生成随机密码并写入日志一次，不落盘到仓库。
+      password: ${OJ_DEV_ADMIN_PASSWORD:}
+  dev-internal-api:
+    enabled: true
+    token: ${OJ_DEV_INTERNAL_TOKEN:dev-internal-only}
+  export:
+    dir: ./var/exports
+
+logging:
+  level:
+    root: info
