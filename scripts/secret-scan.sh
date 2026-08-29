@@ -34,10 +34,12 @@ warn() { printf '[secret-scan][HIT] %s\n' "$*"; }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --root=*)  ROOT="${1#*=}" ;;
-    --strict)  STRICT=1 ;;
-    --tool=*)  TOOL="${1#*=}" ;;
-    -h|--help) usage; exit 0 ;;
+    --root)      ROOT="${2:?--root 需要一个参数}"; shift ;;
+    --root=*)    ROOT="${1#*=}" ;;
+    --strict)    STRICT=1 ;;
+    --tool)      TOOL="${2:?--tool 需要一个参数}"; shift ;;
+    --tool=*)    TOOL="${1#*=}" ;;
+    -h|--help)   usage; exit 0 ;;
     *) echo "未知参数：$1" >&2; exit 2 ;;
   esac
   shift
@@ -73,18 +75,19 @@ scan_hardcoded_secrets() {
   done < <(find "$ROOT" -type f -print0)
 }
 
-# 3) 旧 CodeOJ 文件与标记（旧代码、旧密钥、旧部署目录）
+# 3) 旧 CodeOJ 文件与标记：按文件/目录名识别旧产物（旧代码、旧密钥、旧部署目录）。
+#    仅匹配名称，不做全文"codeoj"字符串扫描——否则会误伤 preflight.sh 等
+#    专门用于"检测/清理旧 CodeOJ"的加固脚本本身。
 scan_legacy_codeoj() {
-  local f
-  while IFS= read -r -d '' f; do
-    if grep -qEi '(codeoj|code-oj|code_oj)' "$f" 2>/dev/null; then
-      record "旧 CodeOJ 标记：$f"
-    fi
-  done < <(find "$ROOT" -type f -print0)
-  # 目录/文件名为 codeoj 的旧产物
-  find "$ROOT" -iname '*codeoj*' -print 2>/dev/null | while IFS= read -r p; do
+  local p
+  while IFS= read -r -d '' p; do
     record "旧 CodeOJ 文件/目录：$p"
-  done
+  done < <(find "$ROOT" \( \
+      -iname '*codeoj*' \
+      -o -iname '*code-oj*' \
+      -o -iname '*code_oj*' \
+      -o -iname 'ecosystem.config.*' \
+      -o -iname '.pm2*' \) -print0 2>/dev/null)
 }
 
 # 可选外部工具（若安装了 gitleaks/trufflehog）
