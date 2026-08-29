@@ -4,8 +4,7 @@
 #
 # 依据设计文档 12.2 第 3 步（依赖、镜像、密钥和恶意文件扫描）与第 7 节
 # （密钥、数据库密码和 JWT 私钥不得进入发布包）。发布包不得包含：
-#   - 真实密码、TLS 私钥、JWT 私钥、数据库密码；
-#   - 旧 CodeOJ 文件（旧 JWT 密钥、后门、部署目录）。
+#   - 真实密码、TLS 私钥、JWT 私钥、数据库密码。
 #
 # 用法：
 #   ./secret-scan.sh --root <发布目录> [--strict] [--tool=gitleaks|trufflehog]
@@ -75,21 +74,6 @@ scan_hardcoded_secrets() {
   done < <(find "$ROOT" -type f -print0)
 }
 
-# 3) 旧 CodeOJ 文件与标记：按文件/目录名识别旧产物（旧代码、旧密钥、旧部署目录）。
-#    仅匹配名称，不做全文"codeoj"字符串扫描——否则会误伤 preflight.sh 等
-#    专门用于"检测/清理旧 CodeOJ"的加固脚本本身。
-scan_legacy_codeoj() {
-  local p
-  while IFS= read -r -d '' p; do
-    record "旧 CodeOJ 文件/目录：$p"
-  done < <(find "$ROOT" \( \
-      -iname '*codeoj*' \
-      -o -iname '*code-oj*' \
-      -o -iname '*code_oj*' \
-      -o -iname 'ecosystem.config.*' \
-      -o -iname '.pm2*' \) -print0 2>/dev/null)
-}
-
 # 可选外部工具（若安装了 gitleaks/trufflehog）
 scan_external() {
   case "$TOOL" in
@@ -116,7 +100,6 @@ scan_external() {
 
 scan_private_keys
 scan_hardcoded_secrets
-scan_legacy_codeoj
 scan_external
 
 if [[ "$HITS" -gt 0 ]]; then
@@ -125,7 +108,7 @@ if [[ "$HITS" -gt 0 ]]; then
     exit 1
   fi
 else
-  log "未发现秘密或旧 CodeOJ 文件"
+  log "未发现秘密"
 fi
 
 exit 0

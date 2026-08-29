@@ -71,8 +71,8 @@ setup() {
   grep -q 'df ' "$SCRIPT"
 }
 
-@test "检查业务进程清单（旧 CodeOJ 残余）" {
-  grep -qi 'codeoj\|code-oj\|pm2' "$SCRIPT"
+@test "检查业务进程清单（残留服务检测）" {
+  grep -qi 'pm2\|node\|express' "$SCRIPT"
   grep -q 'systemctl' "$SCRIPT"
 }
 

@@ -3,8 +3,7 @@
 # verify-release.sh —— 发布包验签、摘要校验与秘密扫描（Task 3）
 #
 # 依据设计文档 12.2 第 4 步与 12.6「部署包验收」：部署主机预置只读公钥，安装前
-# 先验签再校验摘要，并对发布包做秘密扫描，确保不含真实密码、证书私钥、JWT 私钥
-# 或旧 CodeOJ 文件。
+# 先验签再校验摘要，并对发布包做秘密扫描，确保不含真实密码、证书私钥、JWT 私钥。
 #
 # 用法：
 #   ./verify-release.sh --release-dir /path/oj-release-v1.0.0-linux-amd64 \
@@ -68,6 +67,6 @@ log "摘要校验通过"
 # ---- 3) 秘密扫描（严格模式，命中即失败）----
 log "运行秘密扫描"
 "$SCRIPT_DIR/secret-scan.sh" --root "$RELEASE_DIR" --strict \
-  || die "发布包含秘密或旧 CodeOJ 文件"
+  || die "发布包含秘密"
 
 log "发布包验签、摘要与秘密扫描全部通过"

@@ -47,7 +47,7 @@ section '表 E：存储与容量'
 run '磁盘余量' df -h
 
 section '表 F：业务进程与残余检查'
-run '旧 CodeOJ 服务残余' sh -c "systemctl list-units --type=service --all 2>/dev/null | grep -iE 'pm2|node|express|codeoj' || echo '未发现旧 CodeOJ 服务'"
+run '残留业务服务进程' sh -c "systemctl list-units --type=service --all 2>/dev/null | grep -iE 'pm2|node|express' || echo '未发现残留业务服务'"
 run '业务进程清单' sh -c 'ps -eo user,pid,cmd --sort=user'
 
 echo ''

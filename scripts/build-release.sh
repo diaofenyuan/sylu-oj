@@ -9,7 +9,7 @@
 #   4. 生成 SHA256SUMS 并用离线发布私钥签名；
 #   5. 写入 manifest/release.json（版本、提交、摘要、SBOM/漏洞结论）。
 #
-# 发布包不得包含：真实密码、TLS 私钥、JWT 私钥、管理员初始密码或旧 CodeOJ 文件。
+# 发布包不得包含：真实密码、TLS 私钥、JWT 私钥或管理员初始密码。
 #
 # 用法（Linux CI，需提供离线发布私钥）：
 #   ./build-release.sh --version=1.0.0 --arch=amd64 --commit=<sha> \

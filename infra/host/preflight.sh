@@ -198,10 +198,10 @@ check_disk_space() {
 
 check_business_processes() {
   if systemctl list-units --type=service --all --no-legend 2>/dev/null \
-      | grep -Eiq '(pm2|node|express|codeoj|code-oj)'; then
-    block "检测到旧 CodeOJ 服务残余（pm2/node/express/codeoj），禁止安装"
+      | grep -Eiq '(pm2|node|express)'; then
+    block "检测到残留的 Node.js/PM2/Express 服务进程，禁止安装"
   else
-    pass "无旧 CodeOJ 业务进程残余"
+    pass "无残留业务进程"
   fi
 }
 

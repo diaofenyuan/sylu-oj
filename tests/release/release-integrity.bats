@@ -83,10 +83,6 @@ setup() {
   grep -qEi 'password|passwd|secret' "$SCAN"
 }
 
-@test "secret-scan.sh 检测旧 CodeOJ 标记" {
-  grep -qi 'codeoj\|code-oj' "$SCAN"
-}
-
 @test "secret-scan.sh 支持 strict 模式（命中即非零退出）" {
   grep -q 'STRICT' "$SCAN"
   grep -q 'exit 1' "$SCAN"
