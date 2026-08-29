@@ -1,0 +1,16 @@
+# WorkBuddy session data (project memory/logs)
+.workbuddy/
+
+# OS / temp files
+Thumbs.db
+Desktop.ini
+*.tmp
+~$*
+
+# 不纳入版本控制：合规文档与安全设计文档（仅仓库根目录）
+# 原因：docs/ 含环境基线、网络入口、风险登记与审批记录，plan/ 含安全域划分、
+# 威胁模型与残余风险分析，均属不宜公开的内部材料。
+# 注意：这些文件因此不再受版本控制保护，误删无法从 git 恢复，需另行备份。
+# 前导斜杠表示仅匹配仓库根目录，避免误伤 tests/docs/ 下的测试脚本。
+/docs/
+/plan/
