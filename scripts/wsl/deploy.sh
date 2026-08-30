@@ -39,7 +39,15 @@ fi
 
 if [ ! -x "$OPT/go/bin/go" ]; then
   log "installing Go -> ~/opt/go"
-  curl -sSL -o "$OPT/go.tar.gz" "https://go.dev/dl/go1.24.0.linux-amd64.tar.gz"
+  for url in \
+    "https://go.dev/dl/go1.24.0.linux-amd64.tar.gz" \
+    "https://golang.google.cn/dl/go1.24.0.linux-amd64.tar.gz" \
+    "https://mirrors.aliyun.com/golang/go1.24.0.linux-amd64.tar.gz"; do
+    log "  trying $url"
+    if curl -sSL --connect-timeout 10 -o "$OPT/go.tar.gz" "$url"; then
+      [ -s "$OPT/go.tar.gz" ] && break
+    fi
+  done
   tar xzf "$OPT/go.tar.gz" -C "$OPT" && rm "$OPT/go.tar.gz"
 fi
 
@@ -62,6 +70,7 @@ if [ ! -x "$REPO/var/bin/oj-agent-linux" ]; then
   log "building judge agent (native go)"
   export PATH="$OPT/go/bin:$PATH"
   export GOFLAGS=-mod=mod
+  export GOPROXY="${GOPROXY:-https://goproxy.cn,direct}"
   cd "$REPO/judge/agent"
   go build -o "$REPO/var/bin/oj-agent-linux" ./src
 fi
