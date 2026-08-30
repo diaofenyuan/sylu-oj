@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"log"
+	"os"
 
 	"sylu-oj/judge/judgekit"
 	"sylu-oj/judge/sandbox"
@@ -13,12 +16,14 @@ import (
 // 语言运行时来自固定镜像摘要，参数来自服务端白名单（language-policy.yaml），
 // 禁止 Shell 拼接。状态码映射与聚合在 judgekit（与离线复判共享同一实现）。
 
+// Judge 判题管线宿主。
 type Judge struct {
 	client         *TestcaseClient
 	runner         sandbox.Runner
 	policy         *judgekit.Policy
 	sandboxMode    string
 	fallbackNotice string
+	debug          bool
 }
 
 func NewJudge(client *TestcaseClient, runner sandbox.Runner, policy *judgekit.Policy, fallbackNotice string) *Judge {
@@ -28,6 +33,7 @@ func NewJudge(client *TestcaseClient, runner sandbox.Runner, policy *judgekit.Po
 		policy:         policy,
 		sandboxMode:    runner.Name(),
 		fallbackNotice: fallbackNotice,
+		debug:          os.Getenv("OJ_DEBUG") != "",
 	}
 }
 
@@ -106,7 +112,6 @@ func (j *Judge) JudgeTask(ctx context.Context, task *Task) (*CaseResultSubmissio
 			Stdin:   testcase.Input,
 			Workdir: "/workspace",
 		}, runLimits(lang.Run, snap))
-		testcase.Wipe()
 		if err != nil {
 			return nil, fmt.Errorf("运行沙箱执行失败（测试点 %d）: %w", order, err)
 		}
@@ -119,6 +124,13 @@ func (j *Judge) JudgeTask(ctx context.Context, task *Task) (*CaseResultSubmissio
 			ForbiddenSys: runRes.ForbiddenSys,
 			Output:       runRes.Output,
 		}, testcase.ExpectedOutput)
+		if j.debug {
+			log.Printf("DEBUG run task=%s order=%d exit=%d signal=%q timedOut=%v outputLimit=%v outHex=%s expHex=%s",
+				task.TaskUuid, order, runRes.ExitCode, runRes.Signal, runRes.TimedOut,
+				runRes.OutputLimit, hex.EncodeToString(runRes.Output), hex.EncodeToString(testcase.ExpectedOutput))
+		}
+		// 对答案（与调试输出）之后才能清零：过早 Wipe 会把期望输出变全零（WA 误判）
+		testcase.Wipe()
 		score := 0.0
 		if status == "AC" {
 			score = scoreOf[order]

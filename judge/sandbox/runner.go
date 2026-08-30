@@ -82,7 +82,18 @@ type Runner interface {
 // SelectRunner 按"优先 MicroVM、显式降级 gVisor"选择执行器。
 // fallbackNotice 非 nil 时调用方必须将降级写入风险登记与告警，
 // 并禁止考试模式自动继续（设计 6.1.5）。
+// "host-dev" 是仅限开发联调的显式选项（宿主机直执行，无隔离），
+// auto/gvisor 路径永远不会静默选择它。
 func SelectRunner(preferred string) (runner Runner, fallbackNotice *FallbackNotice) {
+	if preferred == "host-dev" {
+		hr := NewHostRunner()
+		if err := hr.Available(); err == nil {
+			return hr, &FallbackNotice{
+				Reason: "DEV-ONLY host runner：宿主机直执行，无容器/资源隔离，禁止用于生产与考试",
+			}
+		}
+		return nil, &FallbackNotice{Reason: "host-dev runner 不可用", Blocked: true}
+	}
 	fr := NewFirecrackerRunner()
 	if preferred != "gvisor" {
 		if err := fr.Available(); err == nil {

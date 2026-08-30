@@ -1,0 +1,101 @@
+# 开发联调语言策略（仅限 OJ_SANDBOX_PREFERRED=host-dev 的开发 Agent）。
+# 与 language-policy.yaml 的白名单 argv/limits 一致；runtimes.image 仅需
+# 通过"非占位符"校验（host-dev 不拉取镜像，直接使用 WSL 宿主机工具链）。
+# 禁止用于生产/考试：无容器隔离，资源上限仅墙钟与输出生效。
+version: 1
+runtimes:
+  gcc-13.3-c17:
+    image: host-dev/toolchain-c:dev
+  gcc-13.3-c++20:
+    image: host-dev/toolchain-cpp:dev
+  cpython-3.12:
+    image: host-dev/toolchain-python:dev
+  openjdk-21:
+    image: host-dev/toolchain-java:dev
+
+languages:
+  C:
+    runtime: gcc-13.3-c17
+    compile:
+      argv: ["gcc", "-O2", "-std=c17", "-pipe", "-o", "main", "main.c"]
+      source: main.c
+      product: main
+      wallClockSec: 15
+      cpuTimeSec: 10
+      memoryKb: 1048576
+      pids: 64
+      diskKb: 65536
+      outputBytes: 65536
+    run:
+      argv: ["./main"]
+      wallClockSec: 10
+      cpuTimeSec: 8
+      memoryKb: 524288
+      pids: 64
+      diskKb: 32768
+      outputBytes: 1048576
+  CPP:
+    runtime: gcc-13.3-c++20
+    compile:
+      argv: ["g++", "-O2", "-std=c++20", "-pipe", "-o", "main", "main.cpp"]
+      source: main.cpp
+      product: main
+      wallClockSec: 20
+      cpuTimeSec: 15
+      memoryKb: 1048576
+      pids: 64
+      diskKb: 65536
+      outputBytes: 65536
+    run:
+      argv: ["./main"]
+      wallClockSec: 10
+      cpuTimeSec: 8
+      memoryKb: 524288
+      pids: 64
+      diskKb: 32768
+      outputBytes: 1048576
+  PYTHON:
+    runtime: cpython-3.12
+    compile: null
+    run:
+      argv: ["python3", "-I", "-S", "main.py"]
+      source: main.py
+      wallClockSec: 10
+      cpuTimeSec: 8
+      memoryKb: 524288
+      pids: 64
+      diskKb: 32768
+      outputBytes: 1048576
+  JAVA:
+    runtime: openjdk-21
+    compile:
+      argv: ["javac", "-proc:none", "-J-XX:+UseSerialGC", "Main.java"]
+      source: Main.java
+      product: "*.class"
+      wallClockSec: 25
+      cpuTimeSec: 20
+      memoryKb: 2097152
+      pids: 256
+      diskKb: 131072
+      outputBytes: 131072
+    run:
+      argv: ["java", "-XX:+UseSerialGC", "-Xss64m", "-XX:MaxRAMPercentage=80", "Main"]
+      wallClockSec: 12
+      cpuTimeSec: 10
+      memoryKb: 1048576
+      pids: 256
+      diskKb: 65536
+      outputBytes: 1048576
+
+global:
+  sandbox:
+    network: none
+    rootfsReadOnly: false
+    writeLayer: host-temp-dir
+    nonRoot: false
+    noNewPrivileges: false
+    capabilities: none
+    seccompProfile: none-dev-only
+    apparmorProfile: none-dev-only
+  staticLinking: allow-dev-only
+  maxProcessTree: 256

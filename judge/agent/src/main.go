@@ -120,8 +120,8 @@ func main() {
 }
 
 func mapPreferred(p string) string {
-	if p == "gvisor" {
-		return "gvisor"
+	if p == "gvisor" || p == "host-dev" {
+		return p
 	}
 	return "auto"
 }
