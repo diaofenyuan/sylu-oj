@@ -92,13 +92,13 @@ if [ ! -f "$REPO/var/oj-dev-agent.env" ]; then
     sec=$(echo "$resp" | sed -n 's/.*"secret":"\([^"]*\)".*/\1/p')
     { echo "OJ_AGENT_ID=$id"; echo "OJ_AGENT_SECRET=$sec"; } > "$REPO/var/oj-dev-agent.env"
   fi
-  # gateway is local inside WSL
-  sed -i 's#^OJ_GATEWAY_URL=.*#OJ_GATEWAY_URL=http://127.0.0.1:8080/api/judge/v1#' "$REPO/var/oj-dev-agent.env"
-  grep -q '^OJ_GATEWAY_URL=' "$REPO/var/oj-dev-agent.env" || echo "OJ_GATEWAY_URL=http://127.0.0.1:8080/api/judge/v1" >> "$REPO/var/oj-dev-agent.env"
-  grep -q '^OJ_POLICY_FILE=' "$REPO/var/oj-dev-agent.env" || echo "OJ_POLICY_FILE=$REPO/judge/sandbox/language-policy.dev.yaml" >> "$REPO/var/oj-dev-agent.env"
-  grep -q '^OJ_SANDBOX_PREFERRED=' "$REPO/var/oj-dev-agent.env" || echo "OJ_SANDBOX_PREFERRED=host-dev" >> "$REPO/var/oj-dev-agent.env"
 fi
+# gateway/policy are always WSL-local regardless of where the env came from
+sed -i 's#^OJ_GATEWAY_URL=.*#OJ_GATEWAY_URL=http://127.0.0.1:8080/api/judge/v1#' "$REPO/var/oj-dev-agent.env"
 sed -i 's#^OJ_POLICY_FILE=.*#OJ_POLICY_FILE='"$REPO"'/judge/sandbox/language-policy.dev.yaml#' "$REPO/var/oj-dev-agent.env"
+grep -q '^OJ_GATEWAY_URL=' "$REPO/var/oj-dev-agent.env" || echo "OJ_GATEWAY_URL=http://127.0.0.1:8080/api/judge/v1" >> "$REPO/var/oj-dev-agent.env"
+grep -q '^OJ_POLICY_FILE=' "$REPO/var/oj-dev-agent.env" || echo "OJ_POLICY_FILE=$REPO/judge/sandbox/language-policy.dev.yaml" >> "$REPO/var/oj-dev-agent.env"
+grep -q '^OJ_SANDBOX_PREFERRED=' "$REPO/var/oj-dev-agent.env" || echo "OJ_SANDBOX_PREFERRED=host-dev" >> "$REPO/var/oj-dev-agent.env"
 
 # Windows-committed shell scripts lose the exec bit; restore it
 chmod +x "$REPO"/scripts/wsl/*.sh 2>/dev/null || true
