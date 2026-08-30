@@ -26,6 +26,8 @@ import (
 	"io"
 	"net/http"
 	"time"
+
+	"sylu-oj/judge/judgekit"
 )
 
 const envelopeAlgo = "AES-256-GCM"
@@ -211,14 +213,8 @@ type Task struct {
 	LeaseExpiresAt  string      `json:"leaseExpiresAt"`
 }
 
-// CaseOutcome 为单个测试点结果。
-type CaseOutcome struct {
-	Order    int     `json:"order"`
-	Status   string  `json:"status"`
-	Score    float64 `json:"score"`
-	TimeMs   int64   `json:"timeMs"`
-	MemoryKb int64   `json:"memoryKb"`
-}
+// CaseOutcome 为单个测试点结果（与离线复判共享 judgekit 定义）。
+type CaseOutcome = judgekit.CaseOutcome
 
 // CaseResultSubmission 为结果回传体；Score 必须为两位小数（与签名 canonical 一致）。
 type CaseResultSubmission struct {

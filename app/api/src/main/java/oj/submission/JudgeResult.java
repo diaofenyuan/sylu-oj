@@ -103,6 +103,10 @@ public class JudgeResult {
         return resultVersion;
     }
 
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
     public void applyNewVersion(String resultCode, BigDecimal normalizedScore,
                                 long totalTimeMs, long peakMemoryKb, String agentId, int resultVersion) {
         this.resultCode = resultCode;

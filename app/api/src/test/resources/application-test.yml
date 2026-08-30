@@ -33,6 +33,8 @@ oj:
     mq:
       mode: inline
     crypto-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+  exam:
+    archive-dir: target/exam-archives
 
 logging:
   level:

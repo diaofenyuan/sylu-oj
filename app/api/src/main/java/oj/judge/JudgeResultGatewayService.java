@@ -60,6 +60,7 @@ public class JudgeResultGatewayService {
     private final ObjectMapper objectMapper;
     private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
     private final JudgeMetrics judgeMetrics;
+    private final oj.exam.ExamService examService;
 
     public JudgeResultGatewayService(JudgeTaskRepository taskRepository,
                                      JudgeResultRepository judgeResultRepository,
@@ -71,7 +72,8 @@ public class JudgeResultGatewayService {
                                      AuditService auditService,
                                      ObjectMapper objectMapper,
                                      io.micrometer.core.instrument.MeterRegistry meterRegistry,
-                                     JudgeMetrics judgeMetrics) {
+                                     JudgeMetrics judgeMetrics,
+                                     oj.exam.ExamService examService) {
         this.taskRepository = taskRepository;
         this.judgeResultRepository = judgeResultRepository;
         this.snapshotRepository = snapshotRepository;
@@ -83,6 +85,7 @@ public class JudgeResultGatewayService {
         this.objectMapper = objectMapper;
         this.meterRegistry = meterRegistry;
         this.judgeMetrics = judgeMetrics;
+        this.examService = examService;
     }
 
     @Transactional
@@ -154,6 +157,9 @@ public class JudgeResultGatewayService {
         }
         // 结果分布指标（SE 激增告警消费）
         meterRegistry.counter("oj_judge_results_total", "code", command.resultCode()).increment();
+        // 申诉复判回调（Task 9）：差异写入申诉单，REJUDGED 等待人工复核
+        examService.applyRejudgeOutcome(task.getSubmissionId(), command.resultCode(),
+                result.getNormalizedScore());
         return new GatewayResult(result, false);
     }
 

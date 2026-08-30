@@ -66,6 +66,7 @@ class JudgeGatewayTest extends TestSupport {
     private JdbcTemplate jdbcTemplate;
 
     private static final String[] CLEANUP = {
+            "exam_spot_check", "exam_appeal", "exam_archive", "exam_approval", "exam_lock",
             "testcase_distribution", "judge_outbox", "judge_task", "judge_agent",
             "audit_event", "testcase_result", "judge_result", "submission", "submission_counter",
             "problem_snapshot", "assignment_target", "assignment_problem", "assignment",

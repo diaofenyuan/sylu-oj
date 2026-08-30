@@ -1,4 +1,4 @@
-module sylu-oj/judge/agent
+module sylu-oj/judge/rejudge
 
 go 1.24
 

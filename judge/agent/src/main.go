@@ -25,6 +25,7 @@ import (
 	"syscall"
 	"time"
 
+	"sylu-oj/judge/judgekit"
 	"sylu-oj/judge/sandbox"
 )
 
@@ -37,7 +38,7 @@ func main() {
 	}
 	policyPath := envOr("OJ_POLICY_FILE", "/etc/oj-judge/language-policy.yaml")
 
-	policy, err := LoadPolicy(policyPath)
+	policy, err := judgekit.LoadPolicy(policyPath)
 	if err != nil {
 		log.Fatalf("语言策略不可用，拒绝判题: %v", err)
 	}

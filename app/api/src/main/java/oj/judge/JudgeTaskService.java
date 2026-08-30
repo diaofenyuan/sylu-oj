@@ -40,6 +40,11 @@ public class JudgeTaskService {
             "PYTHON", "cpython-3.12",
             "JAVA", "openjdk-21");
 
+    /** 供考试锁定冻结的运行时标识集合（Task 9）。 */
+    public static java.util.Set<String> runtimeIds() {
+        return java.util.Set.copyOf(RUNTIMES.values());
+    }
+
     private final JudgeTaskRepository taskRepository;
     private final JudgeOutboxRepository outboxRepository;
     private final ProblemSnapshotRepository snapshotRepository;
@@ -118,6 +123,21 @@ public class JudgeTaskService {
         auditService.record(AuditActions.JUDGE_TASK_RETRY_SCHEDULED, "JUDGE_TASK", retry.getTaskUuid(),
                 null, Map.of("submissionId", submission.getId(), "attempt", nextAttempt));
         dispatch(JudgeOutbox.EVENT_TASK_RETRY, retry);
+    }
+
+    /** 考试申诉复判（Task 9）：人工触发的新 attempt 判题任务（不受 SE 上限约束）。 */
+    @Transactional
+    public String scheduleManualRejudge(Long submissionId) {
+        Submission submission = submissionRepository.findById(submissionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "提交不存在"));
+        JudgeTask last = taskRepository.findFirstBySubmissionIdOrderByAttemptDesc(submissionId)
+                .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR, "提交无历史判题任务"));
+        ProblemSnapshot snapshot = snapshotRepository.findById(last.getSnapshotId())
+                .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR, "任务对应快照缺失"));
+        JudgeTask task = newTask(submission, snapshot, last.getAttempt() + 1);
+        taskRepository.save(task);
+        dispatch(JudgeOutbox.EVENT_TASK_RETRY, task);
+        return task.getTaskUuid();
     }
 
     private JudgeTask newTask(Submission submission, ProblemSnapshot snapshot, int attempt) {

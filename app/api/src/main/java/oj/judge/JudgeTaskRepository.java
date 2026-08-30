@@ -16,6 +16,8 @@ public interface JudgeTaskRepository extends JpaRepository<JudgeTask, Long> {
 
     Optional<JudgeTask> findBySubmissionIdAndAttempt(Long submissionId, int attempt);
 
+    Optional<JudgeTask> findFirstBySubmissionIdOrderByAttemptDesc(Long submissionId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<JudgeTask> findFirstByStatusAndDispatchedAtIsNotNullOrderByIdAsc(String status);
 

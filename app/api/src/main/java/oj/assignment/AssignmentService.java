@@ -44,6 +44,7 @@ public class AssignmentService {
     private final AuditService auditService;
     private final AccessGuard accessGuard;
     private final ObjectMapper objectMapper;
+    private final oj.exam.ExamService examService;
 
     public AssignmentService(AssignmentRepository assignmentRepository,
                              AssignmentProblemRepository assignmentProblemRepository,
@@ -53,7 +54,8 @@ public class AssignmentService {
                              ClassroomService classroomService,
                              AuditService auditService,
                              AccessGuard accessGuard,
-                             ObjectMapper objectMapper) {
+                             ObjectMapper objectMapper,
+                             oj.exam.ExamService examService) {
         this.assignmentRepository = assignmentRepository;
         this.assignmentProblemRepository = assignmentProblemRepository;
         this.targetRepository = targetRepository;
@@ -63,6 +65,7 @@ public class AssignmentService {
         this.auditService = auditService;
         this.accessGuard = accessGuard;
         this.objectMapper = objectMapper;
+        this.examService = examService;
     }
 
     public record CompositionItem(Long problemId, BigDecimal weight) {
@@ -137,7 +140,8 @@ public class AssignmentService {
             throw new ApiException(ErrorCode.ASSIGNMENT_NOT_PUBLISHED, "作业已撤回，不能再发布");
         }
         if (assignment.getStatus() == Assignment.Status.PUBLISHED && assignment.getMode() == Assignment.Mode.EXAM) {
-            throw new ApiException(ErrorCode.EXAM_LOCKED);
+            // Task 9：锁定后的再次发布/重发布须双人审批放行
+            examService.requireChangeAllowed(assignmentId, oj.exam.ExamService.ACTION_PUBLISH);
         }
         if (targetsByClass == null || targetsByClass.isEmpty()) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "至少选择一个目标班级");
@@ -177,6 +181,10 @@ public class AssignmentService {
                             "mode", assignment.getMode().name()));
         }
         assignment.publish();
+        // Task 9：EXAM 发布即自动锁定（冻结判题运行时），此后修改须双人审批放行
+        if (assignment.getMode() == Assignment.Mode.EXAM) {
+            examService.autoLock(assignmentId, user.appUserId());
+        }
         return created;
     }
 
@@ -252,7 +260,7 @@ public class AssignmentService {
             classroomService.requirePrimaryAssignment(user.teacherId(), teachingClassId);
         }
         if (assignment.isExamLocked()) {
-            throw new ApiException(ErrorCode.EXAM_LOCKED);
+            examService.requireChangeAllowed(assignmentId, oj.exam.ExamService.ACTION_CHANGE_TARGET_RULES);
         }
         AssignmentTarget target = requireTarget(assignmentId, teachingClassId);
         Map<String, Object> before = new LinkedHashMap<>();
@@ -302,7 +310,7 @@ public class AssignmentService {
         CurrentUser user = accessGuard.requireAdminOrTeacher();
         Assignment assignment = requireAssignment(assignmentId);
         if (assignment.isExamLocked()) {
-            throw new ApiException(ErrorCode.EXAM_LOCKED);
+            examService.requireChangeAllowed(assignmentId, oj.exam.ExamService.ACTION_WITHDRAW);
         }
         if (user.isTeacher()) {
             requireCreator(assignment, user);

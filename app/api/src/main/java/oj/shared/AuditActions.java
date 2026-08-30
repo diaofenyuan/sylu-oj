@@ -31,6 +31,19 @@ public final class AuditActions {
     public static final String ASSIGNMENT_TARGET_WITHDRAWN = "ASSIGNMENT_TARGET_WITHDRAWN";
     public static final String TARGET_RULES_UPDATED = "TARGET_RULES_UPDATED";
 
+    // 考试模式（Task 9）
+    public static final String EXAM_LOCK_REQUESTED = "EXAM_LOCK_REQUESTED";
+    public static final String EXAM_LOCKED = "EXAM_LOCKED";
+    public static final String EXAM_APPROVAL_APPROVED = "EXAM_APPROVAL_APPROVED";
+    public static final String EXAM_APPROVAL_REJECTED = "EXAM_APPROVAL_REJECTED";
+    public static final String EXAM_CHANGE_ALLOWED = "EXAM_CHANGE_ALLOWED";
+    public static final String EXAM_ARCHIVE_EXPORTED = "EXAM_ARCHIVE_EXPORTED";
+    public static final String EXAM_APPEAL_CREATED = "EXAM_APPEAL_CREATED";
+    public static final String EXAM_APPEAL_REJUDGED = "EXAM_APPEAL_REJUDGED";
+    public static final String EXAM_APPEAL_RESOLVED = "EXAM_APPEAL_RESOLVED";
+    public static final String EXAM_SPOT_CHECK_CREATED = "EXAM_SPOT_CHECK_CREATED";
+    public static final String EXAM_SCORE_REVISED = "EXAM_SCORE_REVISED";
+
     // 提交与判题
     public static final String SUBMISSION_ACCEPTED = "SUBMISSION_ACCEPTED";
     public static final String SUBMISSION_REPLAY_REJECTED = "SUBMISSION_REPLAY_REJECTED";

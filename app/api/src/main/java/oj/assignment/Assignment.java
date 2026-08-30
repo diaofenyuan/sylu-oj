@@ -44,6 +44,9 @@ public class Assignment {
     @Column(name = "created_by", nullable = false)
     private Long createdBy;
 
+    @Column(name = "exam_locked", nullable = false)
+    private boolean examLocked = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -101,6 +104,10 @@ public class Assignment {
     }
 
     public boolean isExamLocked() {
-        return mode == Mode.EXAM && status == Status.PUBLISHED;
+        return mode == Mode.EXAM && status == Status.PUBLISHED && examLocked;
+    }
+
+    public void markExamLocked() {
+        this.examLocked = true;
     }
 }

@@ -60,6 +60,9 @@ public enum ErrorCode {
     ASSIGNMENT_NOT_DRAFT(HttpStatus.CONFLICT, "ASSIGNMENT_NOT_DRAFT", "仅草稿作业可修改组卷"),
     ASSIGNMENT_NOT_PUBLISHED(HttpStatus.CONFLICT, "ASSIGNMENT_NOT_PUBLISHED", "作业未发布"),
     EXAM_LOCKED(HttpStatus.CONFLICT, "EXAM_LOCKED", "正式考试已发布锁定，禁止修改"),
+    EXAM_APPROVAL_REQUIRED(HttpStatus.CONFLICT, "EXAM_APPROVAL_REQUIRED", "考试期间修改需双人审批后重试"),
+    EXAM_SELF_APPROVAL(HttpStatus.CONFLICT, "EXAM_SELF_APPROVAL", "请求人与批准人不得为同一人"),
+    EXAM_NOT_LOCKED(HttpStatus.CONFLICT, "EXAM_NOT_LOCKED", "考试尚未锁定"),
     TARGET_RULE_INVALID(HttpStatus.BAD_REQUEST, "TARGET_RULE_INVALID", "目标班级规则不合法"),
 
     // 提交
