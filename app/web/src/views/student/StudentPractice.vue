@@ -253,7 +253,7 @@ const vscodeTheme = [
     { tag: [tags.tagName, tags.typeName, tags.className, tags.namespace], color: '#4ec9b0' },
     { tag: [tags.definition(tags.variableName), tags.function(tags.variableName), tags.function(tags.propertyName)], color: '#dcdcaa' },
     { tag: [tags.variableName, tags.propertyName, tags.attributeName], color: '#9cdcfe' },
-    { tag: [tags.labelName, tags.constant(tags.variableName), tags.definition(tags.constant)], color: '#b5cea8' },
+    { tag: [tags.labelName, tags.constant(tags.variableName)], color: '#b5cea8' },
     { tag: tags.macroName, color: '#c586c0' },
     { tag: tags.meta, color: '#ce9178' },
     { tag: [tags.punctuation, tags.operator, tags.derefOperator, tags.separator], color: '#d4d4d4' },
