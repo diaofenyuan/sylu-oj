@@ -1,6 +1,10 @@
 <template>
   <div>
-    <h2>班级题库</h2>
+    <div class="page-head">
+      <h2>班级题库</h2>
+      <p class="muted">创建与维护编程题，发布后学生方可作答</p>
+    </div>
+
     <div class="card">
       <h3>新建编程题</h3>
       <div class="row">
@@ -14,19 +18,29 @@
         </select>
         <button @click="create">创建题目</button>
       </div>
-      <p class="muted">创建后可在题目详情中维护公开样例与隐藏用例。</p>
+      <p class="muted hint">创建后可在题目详情中维护公开样例与隐藏用例。</p>
     </div>
 
     <table v-if="problems.length">
       <thead><tr><th>题号</th><th>题名</th><th>语言</th><th>状态</th><th>版本</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in problems" :key="p.id">
-          <td>{{ p.code }}</td><td>{{ p.title }}</td>
-          <td>{{ p.languages }}</td><td>{{ p.status }}</td><td>{{ p.version }}</td>
-          <td><button v-if="p.status !== 'PUBLISHED'" class="secondary" @click="publish(p.id)">发布</button></td>
+          <td><code>{{ p.code }}</code></td>
+          <td><strong>{{ p.title }}</strong></td>
+          <td>{{ (p.languages || []).join(' / ') }}</td>
+          <td>
+            <span class="chip" :class="p.status === 'PUBLISHED' ? 'chip-ok' : 'chip-warn'">
+              {{ statusText(p.status) }}
+            </span>
+          </td>
+          <td class="muted">v{{ p.version }}</td>
+          <td>
+            <button v-if="p.status !== 'PUBLISHED'" class="secondary" @click="publish(p.id)">发布</button>
+          </td>
         </tr>
       </tbody>
     </table>
+    <div v-else class="empty">题库为空，先创建第一道题目吧</div>
   </div>
 </template>
 
@@ -39,6 +53,11 @@ const route = useRoute()
 const classId = route.params.classId
 const problems = ref([])
 const form = ref({ code: '', title: '', language: 'CPP' })
+
+const STATUS = { DRAFT: '草稿', PUBLISHED: '已发布' }
+function statusText(s) {
+  return STATUS[s] || s
+}
 
 async function load() {
   const banks = await api(`/teacher/problem-banks?teachingClassId=${classId}`)
@@ -74,3 +93,14 @@ async function publish(id) {
 
 onMounted(load)
 </script>
+
+<style scoped>
+.hint { margin: 12px 0 0; font-size: 13px; }
+td code {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 13px;
+}
+</style>
