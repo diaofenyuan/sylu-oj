@@ -18,7 +18,9 @@ start_bg() { # name, pidfile, command...
   echo "[start] $name started (pid $!)"
 }
 
-# backend
+# backend (cwd matters: application-dev.yml uses relative ./var/oj-dev paths;
+# must run inside the WSL-native repo, never on /mnt/d via 9p)
+cd "$REPO/app/api"
 start_bg backend "$LOG/backend.pid" env \
   JAVA_HOME="$OPT/jdk17" "$OPT/jdk17/bin/java" -jar \
   "$REPO/app/api/target/oj-api-0.4.0.jar" --spring.profiles.active=dev
