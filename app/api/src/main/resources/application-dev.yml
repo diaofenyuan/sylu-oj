@@ -14,6 +14,12 @@ spring:
 server:
   port: 8080
 
+# 开发环境使用内联判题事件通道，不依赖 RabbitMQ；关闭未使用的连接健康探针。
+management:
+  health:
+    rabbit:
+      enabled: false
+
 oj:
   auth:
     local-accounts-enabled: true

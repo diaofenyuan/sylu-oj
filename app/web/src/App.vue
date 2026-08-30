@@ -1,13 +1,19 @@
 <template>
   <div class="app-shell">
     <header v-if="!isLogin" class="topbar">
-      <router-link :to="role === 'STUDENT' ? '/student' : '/teacher/classes'" class="brand">
+      <router-link :to="homeFor(role)" class="brand">
         <span class="logo">OJ</span>
         <span class="brand-name">SYLU-OJ</span>
-        <span class="brand-tag">{{ role === 'STUDENT' ? '学生端' : '教师端' }}</span>
+        <span class="brand-tag">{{ role === 'STUDENT' ? '学生端' : role === 'ADMIN' ? '管理员端' : '教师端' }}</span>
       </router-link>
       <nav v-if="authed && role === 'STUDENT'">
         <router-link to="/student">我的作业</router-link>
+        <router-link to="/student/practice">刷题中心</router-link>
+      </nav>
+      <nav v-else-if="authed && role === 'ADMIN'">
+        <router-link to="/admin">管理控制台</router-link>
+        <router-link to="/teacher/classes">授课班级</router-link>
+        <router-link to="/teacher/assignment">组卷发布</router-link>
       </nav>
       <nav v-else-if="authed">
         <router-link to="/teacher/classes">授课班级</router-link>
@@ -36,6 +42,12 @@ const role = computed(() => {
   return getRole()
 })
 const authed = computed(() => !!getToken() && !isLogin.value)
+
+function homeFor(r) {
+  if (r === 'STUDENT') return '/student'
+  if (r === 'ADMIN') return '/admin'
+  return '/teacher/classes'
+}
 
 function logout() {
   clearSession()

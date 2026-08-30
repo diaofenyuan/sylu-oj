@@ -101,7 +101,7 @@ async function submit() {
   try {
     await login(loginName.value, password.value)
     const role = await refreshRole()
-    router.push(role === 'STUDENT' ? '/student' : '/teacher/classes')
+    router.push(role === 'STUDENT' ? '/student' : role === 'ADMIN' ? '/admin' : '/teacher/classes')
   } catch (e) {
     error.value = e.message
   } finally {
