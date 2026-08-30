@@ -36,6 +36,7 @@ public class SubmissionService {
     private final AssignmentService assignmentService;
     private final AuditService auditService;
     private final AccessGuard accessGuard;
+    private final oj.judge.JudgeTaskService judgeTaskService;
     private final int maxCodeBytes;
     private final Clock clock;
 
@@ -45,6 +46,7 @@ public class SubmissionService {
                              AssignmentService assignmentService,
                              AuditService auditService,
                              AccessGuard accessGuard,
+                             oj.judge.JudgeTaskService judgeTaskService,
                              @Value("${oj.submission.max-code-bytes:262144}") int maxCodeBytes,
                              Clock clock) {
         this.submissionRepository = submissionRepository;
@@ -53,6 +55,7 @@ public class SubmissionService {
         this.assignmentService = assignmentService;
         this.auditService = auditService;
         this.accessGuard = accessGuard;
+        this.judgeTaskService = judgeTaskService;
         this.maxCodeBytes = maxCodeBytes;
         this.clock = clock;
     }
@@ -124,6 +127,8 @@ public class SubmissionService {
                         "problemId", command.problemId(),
                         "studentId", studentId,
                         "attemptNo", attemptNo));
+        // Task 6：同一事务内创建 PENDING 判题任务与 Outbox 事件
+        judgeTaskService.createTaskForSubmission(submission, snapshot);
         return submission;
     }
 

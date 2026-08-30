@@ -40,6 +40,12 @@
       <artifactId>spring-boot-starter-validation</artifactId>
     </dependency>
 
+    <!-- Judge 事件通道：RabbitMQ over TLS（prod），dev/test 使用内联通道 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-amqp</artifactId>
+    </dependency>
+
     <!-- Schema migration -->
     <dependency>
       <groupId>org.flywaydb</groupId>

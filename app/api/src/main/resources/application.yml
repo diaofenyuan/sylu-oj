@@ -59,5 +59,20 @@ oj:
     token: ""
   submission:
     max-code-bytes: 262144
+  judge:
+    # 事件通道：inline（dev/test，同事务派发）| rabbit（prod，Outbox 调度器经 TLS 发布）
+    mq:
+      mode: inline
+      exchange: oj.judge
+      queue: oj.judge.tasks
+    outbox-poll-ms: 1000
+    task-lease-seconds: 120
+    claim-max-wait-seconds: 25
+    se-max-retries: 3
+    distribution:
+      # 单 Agent 每分钟用例拉取阈值，超限熔断（P1）
+      max-per-minute: 120
+    # Agent 密钥静态加密密钥（64 位十六进制，生产经 systemd 凭据注入）
+    crypto-key: ""
   pagination:
     max-page-size: 100

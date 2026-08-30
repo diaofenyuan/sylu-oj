@@ -49,6 +49,7 @@ class SubmissionConcurrencyTest extends TestSupport {
     private JdbcTemplate jdbcTemplate;
 
     private static final String[] CLEANUP = {
+            "testcase_distribution", "judge_outbox", "judge_task", "judge_agent",
             "audit_event", "testcase_result", "judge_result", "submission", "submission_counter",
             "problem_snapshot", "assignment_target", "assignment_problem", "assignment",
             "testcase", "testcase_set", "problem", "problem_bank",

@@ -8,10 +8,26 @@ spring:
   jpa:
     hibernate:
       ddl-auto: validate
+  rabbitmq:
+    # Judge 事件通道：API（Judge Gateway）与队列同区部署，经 TLS 与凭据保护
+    host: ${OJ_MQ_HOST:api-vm}
+    port: ${OJ_MQ_PORT:5671}
+    username: ${OJ_MQ_USER:oj_api}
+    password: ${OJ_MQ_PASSWORD}
+    virtual-host: ${OJ_MQ_VHOST:oj}
+    ssl:
+      enabled: true
+      algorithm: TLSv1.3
+      validate-server-certificate: true
+    publisher-confirm-type: correlated
 
 oj:
   auth:
     local-accounts-enabled: false
+  judge:
+    mq:
+      mode: rabbit
+    crypto-key: ${OJ_JUDGE_CRYPTO_KEY}
   identity:
     education:
       enabled: true

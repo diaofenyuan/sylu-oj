@@ -26,7 +26,9 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(authInterceptor)
-                .addPathPatterns("/api/**", "/internal/**");
+                .addPathPatterns("/api/**", "/internal/**")
+                // Judge Gateway 使用代理密钥/mTLS 自认证，不走用户 Bearer 认证
+                .excludePathPatterns("/api/judge/v1/**");
     }
 
     @Override

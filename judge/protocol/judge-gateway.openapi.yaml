@@ -1,0 +1,253 @@
+openapi: 3.0.3
+info:
+  title: Judge Gateway API
+  version: "1.0"
+  description: |
+    Judge Gateway 与 Judge Agent 之间的协议（Task 6）。
+
+    安全模型：
+    - Agent 以 mTLS 客户端证书主动连接 Gateway（生产，JUDGE 区 → API 区 TCP 8443），
+      调度端从不主动连接 Runner；dev/test 以 X-Agent-Id + X-Agent-Token 代理密钥认证。
+    - 任务载荷只包含提交代码、语言运行时标识与用例序号引用，
+      不包含测试数据内容、数据库凭据或任何数据区凭据。
+    - 隐藏测试数据按"当前任务单个用例"加密下发（AES-256-GCM 信封），
+      不存在批量拉取或全量同步接口；Agent 在内存解密后写入本次沙箱临时写层，
+      本地磁盘与日志不得留存。
+    - 结果必须以 Agent 绑定密钥的 HMAC-SHA256 签名，Gateway 按
+      任务 ID + result_version 幂等写入；旧版本结果被拒绝。
+servers:
+  - url: https://{gateway-host}/api/judge/v1
+    variables:
+      gateway-host:
+        default: api-vm:8443
+tags:
+  - name: tasks
+  - name: testcases
+  - name: results
+paths:
+  /tasks/claim:
+    post:
+      tags: [tasks]
+      operationId: claimTask
+      summary: 主动长轮询领取一个短期判题任务
+      description: |
+        无可领取任务时服务端挂起至 waitSeconds（上限由网关配置）后返回 204。
+        领取即获得短期租约（leaseExpiresAt）；租约过期任务自动回队。
+      security:
+        - agentAuth: []
+        - mtlsAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClaimRequest'
+      responses:
+        '200':
+          description: 领取成功，返回任务载荷（不含测试数据内容与任何凭据）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JudgeTask'
+        '204':
+          description: 等待期内无可领取任务
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Suspended'
+  /tasks/{taskUuid}/testcases/{order}:
+    post:
+      tags: [testcases]
+      operationId: fetchTestcase
+      summary: 按当前任务逐个拉取加密测试用例
+      description: |
+        仅允许领取该任务的 Agent 在租约内请求该任务用例集内的用例序号；
+        跨题/不匹配请求触发 P1 告警并暂停该 Agent；请求量超阈值同样熔断。
+        返回 AES-256-GCM 密文信封，Agent 在内存解密后写入本次沙箱临时写层。
+      security:
+        - agentAuth: []
+        - mtlsAuth: []
+      parameters:
+        - name: taskUuid
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: order
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '200':
+          description: 加密用例信封（input 与 expectedOutput 合一信封）
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TestcaseEnvelope'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Agent 已熔断、任务不归属该 Agent，或用例与任务不匹配
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 任务租约无效或已过期
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+  /tasks/{taskUuid}/result:
+    post:
+      tags: [results]
+      operationId: submitResult
+      summary: 回传判题结果（HMAC 签名，按任务 ID + result_version 幂等）
+      security:
+        - agentAuth: []
+        - mtlsAuth: []
+      parameters:
+        - name: taskUuid
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JudgeResultSubmission'
+      responses:
+        '201':
+          description: 结果首次写入
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultAck'
+        '200':
+          description: 重复投递（同版本同状态码）按幂等返回既有结果
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultAck'
+        '401':
+          description: 签名无效或认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '409':
+          description: 旧版本结果、任务不归属该 Agent 或租约失效
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '422':
+          description: 结果超出资源上限约束或得分与测试点不一致
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  securitySchemes:
+    agentAuth:
+      type: apiKey
+      in: header
+      description: dev/test 代理密钥认证；生产由 mTLS 客户端证书替代
+      name: X-Agent-Token
+    mtlsAuth:
+      type: mutualTLS
+      description: 生产环境 Agent 客户端证书（JUDGE 区身份），CN 即 Agent 身份
+  schemas:
+    ClaimRequest:
+      type: object
+      properties:
+        waitSeconds:
+          type: integer
+          minimum: 0
+          maximum: 25
+    JudgeTask:
+      type: object
+      required: [taskUuid, submissionId, attempt, problemId, snapshotVersion, language, languageRuntime, judgeConfig, testcaseRefs, leaseExpiresAt]
+      properties:
+        taskUuid: { type: string, format: uuid }
+        submissionId: { type: integer, format: int64 }
+        attempt: { type: integer, minimum: 1 }
+        problemId: { type: integer, format: int64 }
+        snapshotVersion: { type: integer }
+        language: { type: string, enum: [C, CPP, PYTHON, JAVA] }
+        languageRuntime:
+          type: string
+          description: 服务端固定的语言运行时标识（如 gcc-13.3-c++20）
+        judgeConfig:
+          type: string
+          description: 题目快照判题配置 JSON（timeLimitMs/memoryLimitMb/outputLimitKb/maxScore）
+        testcaseRefs:
+          type: array
+          description: 当前任务用例序号引用（不含数据内容，不含任何凭据）
+          items: { type: integer, minimum: 1 }
+        leaseExpiresAt: { type: string, format: date-time }
+    TestcaseEnvelope:
+      type: object
+      required: [testcaseOrder, algo, keyId, iv, ciphertext]
+      properties:
+        testcaseOrder: { type: integer }
+        algo: { type: string, enum: [AES-256-GCM] }
+        keyId: { type: string }
+        iv: { type: string, description: base64(12 字节 IV) }
+        ciphertext: { type: string, description: 'base64(密文+GCM tag)，明文为 input/expectedOutput JSON' }
+    JudgeResultSubmission:
+      type: object
+      required: [resultCode, normalizedScore, totalTimeMs, peakMemoryKb, resultVersion, testcases, signature]
+      properties:
+        resultCode:
+          type: string
+          enum: [CE, AC, WA, RE, TLE, MLE, OLE, PE, SE, BSC]
+          description: 固定状态码枚举（PD 为提交侧状态，不接受回传）
+        normalizedScore:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 100
+        totalTimeMs: { type: integer, format: int64, minimum: 0 }
+        peakMemoryKb: { type: integer, format: int64, minimum: 0 }
+        resultVersion: { type: integer, minimum: 1 }
+        snapshotVersion: { type: integer }
+        testcases:
+          type: array
+          items:
+            type: object
+            required: [order, status, score, timeMs, memoryKb]
+            properties:
+              order: { type: integer }
+              status: { type: string, enum: [CE, AC, WA, RE, TLE, MLE, OLE, PE, SE, BSC] }
+              score: { type: number, minimum: 0 }
+              timeMs: { type: integer, minimum: 0 }
+              memoryKb: { type: integer, minimum: 0 }
+        signature:
+          type: string
+          description: HMAC-SHA256_hex(taskUuid|resultCode|score|totalTimeMs|peakMemoryKb|resultVersion)
+    ResultAck:
+      type: object
+      properties:
+        judgeResultId: { type: integer, format: int64 }
+        resultCode: { type: string }
+        resultVersion: { type: integer }
+        duplicate: { type: boolean }
+    Error:
+      type: object
+      properties:
+        code: { type: string }
+        message: { type: string, description: 面向调用方的通用提示，不含内部细节 }
+  responses:
+    Unauthorized:
+      description: 认证失败
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Suspended:
+      description: Agent 已被熔断暂停
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'

@@ -36,6 +36,11 @@ oj:
     token: ${OJ_DEV_INTERNAL_TOKEN:dev-internal-only}
   export:
     dir: ./var/exports
+  judge:
+    mq:
+      mode: inline
+    # 开发专用密钥，仅用于本地 H2/联调，不得用于生产
+    crypto-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 logging:
   level:

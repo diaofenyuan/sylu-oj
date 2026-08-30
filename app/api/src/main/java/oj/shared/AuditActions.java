@@ -36,6 +36,19 @@ public final class AuditActions {
     public static final String SUBMISSION_REPLAY_REJECTED = "SUBMISSION_REPLAY_REJECTED";
     public static final String JUDGE_RESULT_RECORDED = "JUDGE_RESULT_RECORDED";
 
+    // Judge Gateway、任务调度与测试数据分发（Task 6）
+    public static final String JUDGE_TASK_CREATED = "JUDGE_TASK_CREATED";
+    public static final String JUDGE_TASK_CLAIMED = "JUDGE_TASK_CLAIMED";
+    public static final String JUDGE_TASK_RETRY_SCHEDULED = "JUDGE_TASK_RETRY_SCHEDULED";
+    public static final String JUDGE_RETRY_EXHAUSTED = "JUDGE_RETRY_EXHAUSTED";
+    public static final String JUDGE_TASK_LEASE_EXPIRED = "JUDGE_TASK_LEASE_EXPIRED";
+    public static final String TESTCASE_DISTRIBUTED = "TESTCASE_DISTRIBUTED";
+    public static final String JUDGE_AGENT_REGISTERED = "JUDGE_AGENT_REGISTERED";
+    public static final String TESTCASE_MISMATCH_DETECTED = "TESTCASE_MISMATCH_DETECTED";
+    public static final String AGENT_SUSPENDED = "AGENT_SUSPENDED";
+    public static final String JUDGE_RESULT_SIGNATURE_INVALID = "JUDGE_RESULT_SIGNATURE_INVALID";
+    public static final String JUDGE_RESULT_STALE_REJECTED = "JUDGE_RESULT_STALE_REJECTED";
+
     // 导出
     public static final String EXPORT_REQUESTED = "EXPORT_REQUESTED";
     public static final String EXPORT_GENERATED = "EXPORT_GENERATED";

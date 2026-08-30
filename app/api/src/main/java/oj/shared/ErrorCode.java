@@ -74,6 +74,14 @@ public enum ErrorCode {
     RESULT_SCORE_INVALID(HttpStatus.CONFLICT, "RESULT_SCORE_INVALID", "结果得分不合法"),
     STALE_RESULT_VERSION(HttpStatus.CONFLICT, "STALE_RESULT_VERSION", "旧版本结果不能覆盖新版本"),
 
+    // Judge Gateway 与测试数据分发（Task 6）
+    AGENT_UNAUTHORIZED(HttpStatus.UNAUTHORIZED, "AGENT_UNAUTHORIZED", "判题代理认证失败"),
+    AGENT_SUSPENDED(HttpStatus.FORBIDDEN, "AGENT_SUSPENDED", "判题代理已被暂停，禁止领取任务"),
+    TASK_NOT_CLAIMABLE(HttpStatus.CONFLICT, "TASK_NOT_CLAIMABLE", "任务不可领取、租约已过期或归属其他代理"),
+    TESTCASE_MISMATCH(HttpStatus.FORBIDDEN, "TESTCASE_MISMATCH", "用例请求与当前任务不匹配"),
+    RESULT_SIGNATURE_INVALID(HttpStatus.UNAUTHORIZED, "RESULT_SIGNATURE_INVALID", "结果签名校验失败"),
+    RESULT_LIMIT_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "RESULT_LIMIT_INVALID", "结果超出资源上限约束"),
+
     // 导出
     EXPORT_NOT_READY(HttpStatus.CONFLICT, "EXPORT_NOT_READY", "导出文件尚未就绪"),
     EXPORT_EXPIRED(HttpStatus.CONFLICT, "EXPORT_EXPIRED", "导出文件已过期"),

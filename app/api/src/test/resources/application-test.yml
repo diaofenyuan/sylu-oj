@@ -29,6 +29,10 @@ oj:
     token: test-internal-token
   export:
     dir: target/oj-test-exports
+  judge:
+    mq:
+      mode: inline
+    crypto-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
 
 logging:
   level:

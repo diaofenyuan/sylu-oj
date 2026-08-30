@@ -12,7 +12,8 @@ import java.util.Map;
 
 /**
  * 内部判题结果联调接口（仅 dev/test profile 启用，独立内部令牌保护）。
- * Task 6 的 Judge Gateway 将以 mTLS 接口替代本端点。
+ * Task 6 起生产结果一律经 /api/judge/v1（mTLS + HMAC 签名 + 幂等校验）进入；
+ * 本端点仅作为 dev/内测的判题结果模拟器供既有回归使用，生产禁用。
  */
 @RestController
 @RequestMapping("/internal/judge")
