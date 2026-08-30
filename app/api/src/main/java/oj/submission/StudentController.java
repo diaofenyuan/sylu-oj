@@ -38,6 +38,7 @@ public class StudentController {
     private final AnalyticsService analyticsService;
     private final oj.classroom.ClassroomService classroomService;
     private final oj.submission.SubmissionCounterRepository counterRepository;
+    private final JudgeResultRepository judgeResultRepository;
     private final AccessGuard accessGuard;
 
     public StudentController(AssignmentService assignmentService,
@@ -46,6 +47,7 @@ public class StudentController {
                              AnalyticsService analyticsService,
                              oj.classroom.ClassroomService classroomService,
                              oj.submission.SubmissionCounterRepository counterRepository,
+                             JudgeResultRepository judgeResultRepository,
                              AccessGuard accessGuard) {
         this.assignmentService = assignmentService;
         this.problemService = problemService;
@@ -53,6 +55,7 @@ public class StudentController {
         this.analyticsService = analyticsService;
         this.classroomService = classroomService;
         this.counterRepository = counterRepository;
+        this.judgeResultRepository = judgeResultRepository;
         this.accessGuard = accessGuard;
     }
 
@@ -141,6 +144,10 @@ public class StudentController {
             item.put("judgeStatus", s.getJudgeStatus());
             item.put("submittedAt", s.getCreatedAt().toString());
             item.put("idempotencyKey", s.getIdempotencyKey());
+            judgeResultRepository.findBySubmissionId(s.getId()).ifPresent(jr -> {
+                item.put("normalizedScore", jr.getNormalizedScore());
+                item.put("totalTimeMs", jr.getTotalTimeMs());
+            });
             result.add(item);
         }
         return result;

@@ -1,102 +1,218 @@
 <template>
-  <div class="practice-page">
-    <div class="page-head practice-head">
-      <div>
-        <h2>刷题中心</h2>
-        <p class="muted">从入门到困难，完成 100 道编程题，提交后由安全沙盒自动评测</p>
+  <div class="oj-workbench">
+    <!-- 顶部工具条 -->
+    <div class="wb-topbar">
+      <button class="tb-btn" @click="drawer = true">☰ 题目列表</button>
+      <div class="tb-title">
+        <strong>{{ selected ? selected.code.replace('PRACTICE-', '') + ' ' + selected.title : '刷题中心' }}</strong>
+        <span v-if="selected" class="chip" :class="stateClass(selected.status)">{{ stateText(selected.status) }}</span>
       </div>
-      <div class="progress-summary">
-        <strong>{{ passedCount }}<span>/{{ problems.length }}</span></strong>
-        <span class="muted">已通过</span>
+      <div class="tb-nav">
+        <button class="tb-btn" :disabled="!hasPrev" @click="step(-1)">‹ 上一题</button>
+        <button class="tb-btn" :disabled="!hasNext" @click="step(1)">下一题 ›</button>
+      </div>
+      <div class="tb-progress">
+        <strong>{{ passedCount }}</strong>/<span>{{ problems.length }}</span>
+        <small>已通过</small>
       </div>
     </div>
 
-    <div class="progress-track" aria-label="刷题总进度">
-      <span :style="{ width: `${progressPercent}%` }"></span>
+    <!-- 双栏主体 -->
+    <div class="wb-body">
+      <!-- 左栏:题面 -->
+      <section class="wb-left" :style="{ width: leftWidth + 'px' }">
+        <template v-if="selected">
+          <header class="pr-head">
+            <div class="pr-title">
+              <h3>{{ selected.title }}</h3>
+            </div>
+            <div class="pr-meta">
+              <span class="chip" :class="diffChipClass(selected.difficulty)">{{ difficultyLabel(selected.difficulty) }}</span>
+              <span class="meta-item">时间限制:{{ Math.round(selected.timeLimitMs / 1000) }}s</span>
+              <span class="meta-item">空间限制:{{ selected.memoryLimitMb }}M</span>
+              <span class="meta-item">最佳:{{ selected.bestScore }} 分</span>
+            </div>
+          </header>
+
+          <div class="pr-scroll">
+            <div class="pr-desc">{{ selected.description }}</div>
+
+            <div v-if="selected.samples?.length" class="pr-samples">
+              <div v-for="sample in selected.samples" :key="sample.orderNum" class="sample-box">
+                <div class="sample-head">
+                  <strong>示例 {{ sample.orderNum }}</strong>
+                  <span class="spacer"></span>
+                  <button class="mini-btn" @click="copyText(sample.input, '输入已复制')">复制输入</button>
+                  <button class="mini-btn" @click="copyText(sample.expectedOutput, '输出已复制')">复制输出</button>
+                </div>
+                <div class="sample-io"><span>输入</span><pre>{{ sample.input }}</pre></div>
+                <div class="sample-io"><span>输出</span><pre>{{ sample.expectedOutput }}</pre></div>
+              </div>
+            </div>
+
+            <p class="pr-tip">提交后代码将进入隔离沙盒执行全部隐藏用例;自测运行不占提交次数。</p>
+          </div>
+        </template>
+        <div v-else class="pr-empty">{{ loading ? '题目加载中…' : '从右上角「题目列表」选择一道题' }}</div>
+      </section>
+
+      <!-- 可拖拽分隔条 -->
+      <div class="wb-splitter" @mousedown="startDrag"></div>
+
+      <!-- 右栏:编辑器 + 结果面板 -->
+      <section class="wb-right">
+        <div class="code-toolbar">
+          <select v-model="language" aria-label="选择编程语言">
+            <option v-for="item in selected?.languages || langs" :key="item" :value="item">{{ langName(item) }}</option>
+          </select>
+          <span class="muted mode-tag">ACM 模式 · stdin/stdout</span>
+          <span class="spacer"></span>
+          <button class="tb-btn" @click="resetCode">重置代码</button>
+        </div>
+
+        <div class="cm-wrap">
+          <div ref="cmHost" class="cm-host"></div>
+        </div>
+
+        <!-- 底部结果面板 -->
+        <div class="result-panel" :class="{ collapsed: !panelOpen }">
+          <div class="rp-tabs" role="tablist">
+            <button v-for="t in panels" :key="t.key" class="rp-tab"
+                    :class="{ active: panel === t.key && panelOpen }" @click="openPanel(t.key)">
+              {{ t.label }}
+              <em v-if="t.key === 'submissions'" class="rp-badge">{{ submissions.length }}</em>
+            </button>
+            <span class="spacer"></span>
+            <button class="mini-btn" @click="panelOpen = !panelOpen">{{ panelOpen ? '▾ 收起' : '▴ 展开' }}</button>
+            <button class="run-btn" :disabled="running || !selected" @click="runFromButton">
+              {{ running ? '运行中…' : '自测运行' }}
+            </button>
+            <button class="submit-btn" :disabled="submitting || !selected || !code.trim()" @click="submit">
+              {{ submitting ? '提交中…' : '保存并提交' }}
+            </button>
+          </div>
+
+          <div v-if="panelOpen" class="rp-body">
+            <!-- 执行结果 -->
+            <template v-if="panel === 'result'">
+              <div v-if="resultPhase === 'idle'" class="rp-idle">保存并提交之后,这里将会显示运行结果</div>
+              <div v-else-if="resultPhase === 'pending'" class="rp-pending">
+                <span class="spin"></span> 代码已送入安全沙盒,正在评测隐藏用例…
+              </div>
+              <template v-else>
+                <div class="result-line">
+                  <span class="chip" :class="stateClass(latestResult.status)">{{ stateText(latestResult.status) }}</span>
+                  <span v-if="latestResult.score !== null" class="result-score">得分 <strong>{{ latestResult.score }}</strong>/100</span>
+                  <span v-if="latestResult.timeMs !== null" class="muted">耗时 {{ latestResult.timeMs }}ms</span>
+                </div>
+                <p v-if="latestResult.score !== null && latestResult.score < 100" class="muted result-hint">
+                  未全部通过:可通过左侧样例对照输出,或用「自测运行」调试代码
+                </p>
+              </template>
+            </template>
+
+            <!-- 自测运行 -->
+            <template v-else-if="panel === 'selftest'">
+              <div class="selftest-grid">
+                <div class="st-io">
+                  <div class="st-label">自测输入 <small>(可粘贴样例输入)</small></div>
+                  <textarea v-model="selfTestInput" rows="5" spellcheck="false" class="st-area mono"></textarea>
+                </div>
+                <div class="st-io">
+                  <div class="st-label">
+                    运行输出
+                    <span v-if="selfTestResult">
+                      <span class="chip" :class="selfTestPassed ? 'chip-ok' : 'chip-bad'">{{ selfTestPassed ? '通过' : '与期望输出不一致' }}</span>
+                      <span class="muted">{{ selfTestResult.timeMs }}ms</span>
+                    </span>
+                  </div>
+                  <pre v-if="selfTestResult" class="st-area mono st-out" :class="{ bad: selfTestFailedPhase }">{{ selfTestOutput }}</pre>
+                  <pre v-else class="st-area mono st-out dim">运行后显示输出</pre>
+                </div>
+              </div>
+              <p v-if="selfTestResult?.compileError" class="st-err mono">{{ selfTestResult.compileError }}</p>
+              <p v-else-if="selfTestResult?.stderr" class="st-err mono">{{ selfTestResult.stderr }}</p>
+              <p v-if="selfTestResult?.timedOut" class="st-err">运行超时,请检查是否有死循环或阻塞输入</p>
+            </template>
+
+            <!-- 提交记录 -->
+            <template v-else>
+              <table v-if="submissions.length" class="sub-table">
+                <thead><tr><th>#</th><th>状态</th><th>得分</th><th>语言</th><th>耗时</th><th>提交时间</th></tr></thead>
+                <tbody>
+                  <tr v-for="s in submissions" :key="s.submissionId">
+                    <td>{{ s.attemptNo }}</td>
+                    <td><span class="chip" :class="stateClass(s.judgeStatus)">{{ stateText(s.judgeStatus) }}</span></td>
+                    <td>{{ s.normalizedScore ?? '—' }}</td>
+                    <td>{{ langName(s.language) }}</td>
+                    <td>{{ s.totalTimeMs != null ? s.totalTimeMs + 'ms' : '—' }}</td>
+                    <td class="muted">{{ fmtTime(s.submittedAt) }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <div v-else class="rp-idle">本题暂无提交记录</div>
+            </template>
+          </div>
+        </div>
+      </section>
     </div>
 
-    <div class="level-strip">
-      <button v-for="level in levels" :key="level.key" class="level-tab"
-              :class="{ active: difficulty === level.key }" @click="difficulty = level.key">
-        <span class="level-dot" :class="`dot-${level.key.toLowerCase()}`"></span>
-        <span>{{ level.label }}</span>
-        <small>{{ levelPassed(level.key) }}/{{ levelCount(level.key) }}</small>
-      </button>
-      <button class="level-tab all-tab" :class="{ active: difficulty === '' }" @click="difficulty = ''">
-        <span>全部题目</span><small>{{ passedCount }}/{{ problems.length }}</small>
-      </button>
-    </div>
-
-    <div class="workspace" :class="{ 'has-problem': !!selected }">
-      <aside class="problem-list panel">
+    <!-- 题目列表抽屉 -->
+    <div v-if="drawer" class="drawer-mask" @click.self="drawer = false">
+      <div class="drawer">
+        <div class="drawer-head">
+          <strong>题目列表</strong>
+          <span class="spacer"></span>
+          <span class="muted">{{ passedCount }}/{{ problems.length }} 已通过</span>
+          <button class="mini-btn" @click="drawer = false">✕</button>
+        </div>
+        <div class="level-strip">
+          <button v-for="level in levels" :key="level.key" class="level-tab"
+                  :class="{ active: difficulty === level.key }" @click="difficulty = level.key">
+            {{ level.label }}<small>{{ levelPassed(level.key) }}/{{ levelCount(level.key) }}</small>
+          </button>
+          <button class="level-tab" :class="{ active: difficulty === '' }" @click="difficulty = ''">
+            全部<small>{{ passedCount }}/{{ problems.length }}</small>
+          </button>
+        </div>
         <div class="list-toolbar">
-          <input v-model.trim="keyword" placeholder="搜索题目" aria-label="搜索题目" />
-          <select v-model="statusFilter" aria-label="筛选完成状态">
+          <input v-model.trim="keyword" placeholder="搜索题目" />
+          <select v-model="statusFilter">
             <option value="ALL">全部状态</option>
             <option value="UNATTEMPTED">未开始</option>
             <option value="ATTEMPTED">已尝试</option>
             <option value="AC">已通过</option>
           </select>
         </div>
-        <div v-if="loading" class="empty list-empty">题目加载中…</div>
-        <div v-else-if="!filteredProblems.length" class="empty list-empty">没有匹配的题目</div>
-        <button v-for="problem in filteredProblems" :key="problem.problemId"
-                class="problem-row" :class="{ selected: selectedId === problem.problemId }"
-                @click="selectProblem(problem.problemId)">
-          <span class="problem-no">{{ problem.code.replace('PRACTICE-', '').replaceAll('-', ' ') }}</span>
-          <span class="problem-title">{{ problem.title }}</span>
-          <span class="problem-state" :class="stateClass(problem.status)">{{ stateText(problem.status) }}</span>
-        </button>
-      </aside>
-
-      <section class="editor panel" v-if="selected">
-        <div class="editor-head">
-          <div>
-            <div class="eyebrow">{{ difficultyLabel(selected.difficulty) }}</div>
-            <h3>{{ selected.title }}</h3>
-          </div>
-          <span class="chip" :class="stateClass(selected.status)">{{ stateText(selected.status) }}</span>
-        </div>
-        <div class="problem-description">{{ selected.description }}</div>
-
-        <div v-if="selected.samples?.length" class="samples">
-          <div v-for="sample in selected.samples" :key="sample.orderNum" class="sample-box">
-            <div class="sample-label">样例 {{ sample.orderNum }}</div>
-            <div class="sample-io"><span>输入</span><pre>{{ sample.input }}</pre></div>
-            <div class="sample-io"><span>输出</span><pre>{{ sample.expectedOutput }}</pre></div>
-          </div>
-        </div>
-
-        <div class="code-toolbar">
-          <select v-model="language" aria-label="选择编程语言">
-            <option v-for="item in selected.languages" :key="item" :value="item">{{ langName(item) }}</option>
-          </select>
-          <span class="muted">提交将进入隔离沙盒评测</span>
-          <span class="spacer"></span>
-          <button @click="submit" :disabled="submitting || !code.trim()">
-            {{ submitting ? '评测中…' : '提交代码' }}
+        <div class="drawer-list">
+          <button v-for="problem in filteredProblems" :key="problem.problemId"
+                  class="problem-row" :class="{ selected: selectedId === problem.problemId }"
+                  @click="selectProblem(problem.problemId); drawer = false">
+            <span class="problem-no">{{ problem.code.replace('PRACTICE-', '') }}</span>
+            <span class="problem-title">{{ problem.title }}</span>
+            <span class="problem-state" :class="stateClass(problem.status)">{{ stateText(problem.status) }}</span>
           </button>
+          <div v-if="!filteredProblems.length" class="rp-idle">没有匹配的题目</div>
         </div>
-        <textarea v-model="code" class="code-editor" rows="16" spellcheck="false"
-                  placeholder="在此编写代码…"></textarea>
-        <div v-if="feedback" class="feedback" :class="feedbackClass">{{ feedback }}</div>
-        <div v-if="selected.bestScore > 0" class="best-score">
-          当前最佳得分 <strong>{{ selected.bestScore }}</strong> / 100
-        </div>
-      </section>
-
-      <section v-else class="editor panel empty-detail">
-        <div class="empty-icon">⌘</div>
-        <h3>选择一道题开始练习</h3>
-        <p class="muted">题目按难度分级，提交代码后会由现有判题沙盒执行全部隐藏用例。</p>
-      </section>
+      </div>
     </div>
+
+    <div v-if="tipText" class="copy-tip">{{ tipText }}</div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../../api'
+
+import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
+import { EditorState, Compartment } from '@codemirror/state'
+import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
+import { indentOnInput, bracketMatching } from '@codemirror/language'
+import { oneDark } from '@codemirror/theme-one-dark'
+import { cpp } from '@codemirror/lang-cpp'
+import { python } from '@codemirror/lang-python'
+import { java } from '@codemirror/lang-java'
 
 const levels = [
   { key: 'EASY', label: '入门' },
@@ -104,6 +220,19 @@ const levels = [
   { key: 'INTERMEDIATE', label: '进阶' },
   { key: 'HARD', label: '困难' }
 ]
+const panels = [
+  { key: 'result', label: '执行结果' },
+  { key: 'selftest', label: '自测运行' },
+  { key: 'submissions', label: '提交记录' }
+]
+const langs = ['C', 'CPP', 'PYTHON', 'JAVA']
+const CODE_TEMPLATES = {
+  C: '#include <stdio.h>\n\nint main() {\n    int a, b;\n    scanf("%d %d", &a, &b);\n    printf("%d\\n", a + b);\n    return 0;\n}\n',
+  CPP: '#include <iostream>\nusing namespace std;\n\nint main() {\n    int a, b;\n    cin >> a >> b;\n    cout << a + b << endl;\n    return 0;\n}\n',
+  PYTHON: 'import sys\n\ndata = sys.stdin.read().split()\na, b = int(data[0]), int(data[1])\nprint(a + b)\n',
+  JAVA: 'import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner in = new Scanner(System.in);\n        int a = in.nextInt();\n        int b = in.nextInt();\n        System.out.println(a + b);\n    }\n}\n'
+}
+
 const problems = ref([])
 const selected = ref(null)
 const selectedId = ref(null)
@@ -111,16 +240,29 @@ const difficulty = ref('')
 const keyword = ref('')
 const statusFilter = ref('ALL')
 const loading = ref(true)
-const submitting = ref(false)
-const feedback = ref('')
-const feedbackClass = ref('')
+const drawer = ref(false)
+
 const language = ref('CPP')
 const code = ref('')
+const submitting = ref(false)
+const running = ref(false)
+const panelOpen = ref(true)
+const panel = ref('result')
+const resultPhase = ref('idle')
+const latestResult = ref({ status: null, score: null, timeMs: null })
+const selfTestInput = ref('')
+const selfTestResult = ref(null)
+const submissions = ref([])
+const leftWidth = ref(480)
+
+const cmHost = ref(null)
+let editorView = null
+const langCompartment = new Compartment()
 let pollTimer = null
 
 const filteredProblems = computed(() => problems.value.filter(problem => {
   const matchesDifficulty = !difficulty.value || problem.difficulty === difficulty.value
-  const matchesKeyword = !keyword.value || `${problem.title} ${problem.description}`.toLowerCase().includes(keyword.value.toLowerCase())
+  const matchesKeyword = !keyword.value || `${problem.title} ${problem.code}`.toLowerCase().includes(keyword.value.toLowerCase())
   const matchesStatus = statusFilter.value === 'ALL'
     || (statusFilter.value === 'AC' && problem.status === 'AC')
     || (statusFilter.value === 'ATTEMPTED' && problem.status !== 'UNATTEMPTED')
@@ -128,15 +270,103 @@ const filteredProblems = computed(() => problems.value.filter(problem => {
   return matchesDifficulty && matchesKeyword && matchesStatus
 }))
 const passedCount = computed(() => problems.value.filter(problem => problem.status === 'AC').length)
-const progressPercent = computed(() => problems.value.length ? Math.round(passedCount.value / problems.value.length * 100) : 0)
+const currentIndex = computed(() =>
+  problems.value.findIndex(problem => problem.problemId === selectedId.value))
+const hasPrev = computed(() => currentIndex.value > 0)
+const hasNext = computed(() => currentIndex.value >= 0 && currentIndex.value < problems.value.length - 1)
+const selfTestPassed = computed(() => {
+  if (!selfTestResult.value || selfTestResult.value.phase !== 'FINISHED') return false
+  const expected = matchedSample.value?.expectedOutput
+  if (expected == null) return null
+  return normalize(expected) === normalize(selfTestResult.value.output)
+})
+const selfTestFailedPhase = computed(() =>
+  selfTestResult.value && selfTestResult.value.phase !== 'FINISHED')
+const selfTestOutput = computed(() => {
+  const r = selfTestResult.value
+  if (!r) return ''
+  return r.output || r.stderr || r.compileError || '(无输出)'
+})
+const matchedSample = computed(() =>
+  selected.value?.samples?.find(sample => normalize(sample.input) === normalize(selfTestInput.value)))
+
+function normalize(text) {
+  return String(text ?? '').split('\n').map(line => line.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '')
+}
 
 function difficultyLabel(key) { return levels.find(level => level.key === key)?.label || key }
+function diffChipClass(key) { return ({ EASY: 'chip-ok', BASIC: 'chip-primary', INTERMEDIATE: 'chip-warn', HARD: 'chip-bad' })[key] || 'chip-muted' }
 function levelCount(key) { return problems.value.filter(problem => problem.difficulty === key).length }
 function levelPassed(key) { return problems.value.filter(problem => problem.difficulty === key && problem.status === 'AC').length }
-function stateText(status) { return ({ AC: '已通过', PD: '评测中', UNATTEMPTED: '未开始', WA: '未通过', CE: '编译错误', TLE: '超时', MLE: '内存超限', OLE: '输出超限', PE: '格式错误', RE: '运行错误', SE: '评测服务异常', BSC: '沙盒拦截' })[status] || status }
+function stateText(status) { return ({ AC: '已通过', PD: '评测中', UNATTEMPTED: '未开始', WA: '答案错误', CE: '编译错误', TLE: '超时', MLE: '内存超限', OLE: '输出超限', PE: '格式错误', RE: '运行错误', SE: '评测服务异常', BSC: '沙盒拦截' })[status] || status }
 function stateClass(status) { return ({ AC: 'chip-ok', PD: 'chip-warn', UNATTEMPTED: 'chip-muted', WA: 'chip-bad', CE: 'chip-bad', TLE: 'chip-bad', MLE: 'chip-bad', OLE: 'chip-bad', PE: 'chip-bad', RE: 'chip-bad', SE: 'chip-bad', BSC: 'chip-bad' })[status] || 'chip-muted' }
 function langName(value) { return ({ C: 'C', CPP: 'C++', PYTHON: 'Python', JAVA: 'Java' })[value] || value }
 function draftKey(id) { return `oj-practice-draft-${id}` }
+function fmtTime(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '' }
+
+async function copyText(text, tip) {
+  try {
+    await navigator.clipboard.writeText(text)
+  } catch {
+    const ta = document.createElement('textarea')
+    ta.value = text
+    document.body.appendChild(ta)
+    ta.select()
+    document.execCommand('copy')
+    ta.remove()
+  }
+  flashTip(tip)
+}
+const tipText = ref('')
+function flashTip(text) {
+  tipText.value = text
+  setTimeout(() => { if (tipText.value === text) tipText.value = '' }, 1800)
+}
+
+function langExtension(value) {
+  if (value === 'PYTHON') return python()
+  if (value === 'JAVA') return java()
+  return cpp()
+}
+
+function mountEditor() {
+  if (!cmHost.value || editorView) return
+  editorView = new EditorView({
+    parent: cmHost.value,
+    state: EditorState.create({
+      doc: code.value,
+      extensions: [
+        lineNumbers(),
+        highlightActiveLineGutter(),
+        history(),
+        indentOnInput(),
+        bracketMatching(),
+        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        langCompartment.of(langExtension(language.value)),
+        oneDark,
+        EditorView.theme({
+          '&': { height: '100%', fontSize: '13.5px' },
+          '.cm-scroller': { fontFamily: 'Consolas, Monaco, monospace', lineHeight: '1.6' }
+        }),
+        EditorView.updateListener.of(update => {
+          if (update.docChanged) {
+            code.value = update.state.doc.toString()
+            if (selected.value) localStorage.setItem(draftKey(selected.value.problemId), code.value)
+          }
+        })
+      ]
+    })
+  })
+}
+
+function setEditorDoc(text) {
+  if (!editorView) return
+  editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: text } })
+}
+
+watch(language, value => {
+  editorView?.dispatch({ effects: langCompartment.reconfigure(langExtension(value)) })
+})
 
 async function loadProblems() {
   loading.value = true
@@ -150,45 +380,71 @@ async function loadProblems() {
 
 async function selectProblem(problemId) {
   selectedId.value = problemId
-  feedback.value = ''
+  resultPhase.value = 'idle'
+  latestResult.value = { status: null, score: null, timeMs: null }
+  selfTestResult.value = null
+  clearPoll()
   selected.value = await api(`/student/practice/problems/${problemId}`)
   language.value = selected.value.languages?.[0] || 'CPP'
-  code.value = localStorage.getItem(draftKey(problemId)) || ''
+  const firstSample = selected.value.samples?.[0]
+  selfTestInput.value = firstSample?.input || ''
+  code.value = localStorage.getItem(draftKey(problemId)) || CODE_TEMPLATES[language.value] || ''
+  if (!editorView) {
+    await nextTick()
+    mountEditor()
+  }
+  setEditorDoc(code.value)
   await refreshSubmissionStatus()
+  loadSubmissions()
+}
+
+async function loadSubmissions() {
+  if (!selected.value) return
+  const problemId = selected.value.problemId
+  const list = await api(`/student/submissions?assignmentTargetId=${selected.value.assignmentTargetId}&problemId=${problemId}`)
+  if (selected.value?.problemId !== problemId) return
+  submissions.value = list.slice().reverse()
 }
 
 async function refreshSubmissionStatus() {
-  if (pollTimer) {
-    clearTimeout(pollTimer)
-    pollTimer = null
-  }
+  clearPoll()
   if (!selected.value) return
   const problemId = selected.value.problemId
-  const submissions = await api(`/student/submissions?assignmentTargetId=${selected.value.assignmentTargetId}&problemId=${problemId}`)
-  // 切题期间忽略旧请求返回，避免覆盖新题目的状态。
+  const list = await api(`/student/submissions?assignmentTargetId=${selected.value.assignmentTargetId}&problemId=${problemId}`)
   if (!selected.value || selected.value.problemId !== problemId) return
-  const latest = submissions.at(-1)
-  if (latest && latest.judgeStatus !== 'PD') {
-    selected.value.status = latest.judgeStatus
-    if (latest.judgeStatus === 'AC') {
-      selected.value.bestScore = 100
-      const item = problems.value.find(problem => problem.problemId === selected.value.problemId)
-      if (item) { item.status = 'AC'; item.bestScore = 100 }
-    }
+  const latest = list.at(-1)
+  if (!latest) return
+  if (latest.judgeStatus === 'PD') {
+    if (resultPhase.value !== 'idle') resultPhase.value = 'pending'
+    pollTimer = setTimeout(() => { pollTimer = null; refreshSubmissionStatus() }, 2000)
+    return
   }
-  if (latest?.judgeStatus === 'PD') {
-    pollTimer = setTimeout(() => {
-      pollTimer = null
-      refreshSubmissionStatus()
-    }, 2200)
+  latestResult.value = {
+    status: latest.judgeStatus,
+    score: latest.normalizedScore ?? null,
+    timeMs: latest.totalTimeMs ?? null
   }
+  if (resultPhase.value === 'pending' || latest.judgeStatus === 'AC') {
+    resultPhase.value = 'done'
+    panelOpen.value = true
+  }
+  selected.value.status = latest.judgeStatus
+  if (latest.judgeStatus === 'AC') {
+    selected.value.bestScore = 100
+    const item = problems.value.find(problem => problem.problemId === problemId)
+    if (item) { item.status = 'AC'; item.bestScore = 100 }
+  }
+  loadSubmissions()
+}
+
+function clearPoll() {
+  if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
 }
 
 async function submit() {
   if (!selected.value || !code.value.trim()) return
   localStorage.setItem(draftKey(selected.value.problemId), code.value)
   submitting.value = true
-  feedback.value = ''
   try {
     await api('/student/submissions', {
       method: 'POST',
@@ -200,85 +456,325 @@ async function submit() {
         idempotencyKey: crypto.randomUUID()
       }
     })
-    feedback.value = '代码已送入安全沙盒，正在评测隐藏用例…'
-    feedbackClass.value = 'feedback-pending'
     selected.value.status = 'PD'
     const item = problems.value.find(problem => problem.problemId === selected.value.problemId)
     if (item) item.status = 'PD'
+    panel.value = 'result'
+    panelOpen.value = true
+    resultPhase.value = 'pending'
     await refreshSubmissionStatus()
-  } catch (error) {
-    feedback.value = `提交失败：${error.message}`
-    feedbackClass.value = 'feedback-error'
   } finally {
     submitting.value = false
   }
 }
 
+async function runSelfTest() {
+  if (!selected.value || running.value) return
+  running.value = true
+  selfTestResult.value = null
+  try {
+    selfTestResult.value = await api('/student/practice/run', {
+      method: 'POST',
+      body: {
+        problemId: selected.value.problemId,
+        language: language.value,
+        code: code.value,
+        input: selfTestInput.value
+      }
+    })
+  } catch (e) {
+    selfTestResult.value = { phase: 'FINISHED', output: '', stderr: e.message, exitCode: -1, timeMs: 0, timedOut: false }
+  } finally {
+    running.value = false
+  }
+}
+
+function resetCode() {
+  const template = CODE_TEMPLATES[language.value] || ''
+  code.value = template
+  setEditorDoc(template)
+  if (selected.value) localStorage.setItem(draftKey(selected.value.problemId), template)
+}
+
+function openPanel(key) {
+  panelOpen.value = true
+  if (panel.value === key && key !== 'selftest') return
+  panel.value = key
+  if (key === 'submissions') loadSubmissions()
+}
+
+function runFromButton() {
+  openPanel('selftest')
+  runSelfTest()
+}
+
+function step(delta) {
+  const next = problems.value[currentIndex.value + delta]
+  if (next) selectProblem(next.problemId)
+}
+
 watch(code, value => {
-  if (selected.value && value) localStorage.setItem(draftKey(selected.value.problemId), value)
-})
-watch(difficulty, async value => {
-  // 难度切换只在前端筛选，避免重复创建目录或产生请求瀑布。
-  if (value && selected.value && selected.value.difficulty !== value) {
-    const next = problems.value.find(problem => problem.difficulty === value)
-    if (next) await selectProblem(next.problemId)
+  if (selected.value && value && editorView && editorView.state.doc.toString() !== value) {
+    setEditorDoc(value)
   }
 })
 
-onMounted(loadProblems)
-onUnmounted(() => { if (pollTimer) clearTimeout(pollTimer) })
+function startDrag(event) {
+  event.preventDefault()
+  const startX = event.clientX
+  const startWidth = leftWidth.value
+  const onMove = e => {
+    leftWidth.value = Math.min(Math.max(320, startWidth + e.clientX - startX), window.innerWidth - 420)
+  }
+  const onUp = () => {
+    window.removeEventListener('mousemove', onMove)
+    window.removeEventListener('mouseup', onUp)
+  }
+  window.addEventListener('mousemove', onMove)
+  window.addEventListener('mouseup', onUp)
+}
+
+function onKeydown(event) {
+  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+    event.preventDefault()
+    submit()
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+    event.preventDefault()
+    if (selected.value) localStorage.setItem(draftKey(selected.value.problemId), code.value)
+    flashTip('草稿已保存')
+  }
+}
+
+onMounted(() => {
+  loadProblems()
+  window.addEventListener('keydown', onKeydown)
+})
+onBeforeUnmount(() => {
+  clearPoll()
+  window.removeEventListener('keydown', onKeydown)
+  editorView?.destroy()
+  editorView = null
+})
 </script>
 
 <style scoped>
-.practice-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; }
-.practice-head h2 { margin-bottom: 4px; }
-.practice-head p { margin: 0; }
-.progress-summary { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
-.progress-summary strong { font-size: 26px; color: var(--accent); }
-.progress-summary strong span { color: var(--muted); font-size: 15px; font-weight: 500; }
-.progress-summary .muted { font-size: 12px; margin-top: 4px; }
-.progress-track { height: 7px; border-radius: 999px; background: #e8edf6; overflow: hidden; margin: -8px 0 22px; }
-.progress-track span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #2563eb, #0ea5e9); transition: width .25s ease; }
-.level-strip { display: flex; gap: 8px; margin-bottom: 18px; overflow-x: auto; padding-bottom: 2px; }
-.level-tab { flex: 1; min-width: 136px; border: 1px solid var(--border); background: var(--panel); color: var(--muted); box-shadow: none; padding: 11px 13px; justify-content: flex-start; border-radius: 10px; }
-.level-tab:hover { background: var(--panel-2); border-color: var(--border-strong); box-shadow: none; }
+.oj-workbench { flex: 1; display: flex; flex-direction: column; min-height: 0; height: 100%; }
+
+.wb-topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+.tb-btn {
+  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  box-shadow: none;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+.tb-btn:hover:not(:disabled) { background: var(--panel-2); box-shadow: none; }
+.tb-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.tb-title strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tb-nav { display: flex; gap: 6px; margin-left: auto; }
+.tb-progress { display: flex; align-items: baseline; gap: 2px; color: var(--muted); font-size: 13px; }
+.tb-progress strong { color: var(--accent); font-size: 19px; }
+.tb-progress small { margin-left: 4px; font-size: 12px; }
+
+.wb-body { flex: 1; display: flex; min-height: 0; }
+
+.wb-left {
+  flex: none;
+  min-width: 320px;
+  max-width: 70vw;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  min-height: 0;
+}
+.pr-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+.pr-head h3 { margin: 0 0 8px; font-size: 19px; }
+.pr-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.meta-item { color: var(--muted); font-size: 12.5px; }
+.pr-scroll { flex: 1; overflow-y: auto; padding: 16px 20px 24px; min-height: 0; }
+.pr-desc { white-space: pre-wrap; line-height: 1.85; font-size: 14px; }
+.pr-samples { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.sample-box { border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); padding: 11px 13px; }
+.sample-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.sample-head .spacer { flex: 1; }
+.mini-btn {
+  background: #fff;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  box-shadow: none;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+.mini-btn:hover:not(:disabled) { color: var(--accent); border-color: #c7d9ff; box-shadow: none; }
+.sample-io { display: grid; grid-template-columns: 34px 1fr; gap: 8px; margin-top: 6px; }
+.sample-io span { font-size: 11.5px; color: var(--muted); padding-top: 2px; }
+.sample-io pre { margin: 0; font: 12.5px/1.55 Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
+.pr-tip { margin-top: 20px; font-size: 12.5px; color: var(--muted); }
+.pr-empty { flex: 1; display: grid; place-items: center; color: var(--muted); padding: 30px; }
+
+.wb-splitter {
+  flex: none;
+  width: 5px;
+  cursor: col-resize;
+  background: var(--border);
+  transition: background 0.15s ease;
+}
+.wb-splitter:hover { background: var(--accent); }
+
+.wb-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #1e293b; }
+.code-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+}
+.code-toolbar select { background: #1e293b; color: #e2e8f0; border-color: #334155; padding: 6px 10px; }
+.mode-tag { color: #64748b; font-size: 12px; }
+.code-toolbar .tb-btn { background: #1e293b; color: #cbd5e1; border-color: #334155; }
+.code-toolbar .tb-btn:hover:not(:disabled) { background: #334155; }
+.code-toolbar .spacer { flex: 1; }
+
+.cm-wrap { flex: 1; min-height: 0; }
+.cm-host { height: 100%; }
+.cm-host :deep(.cm-editor) { height: 100%; }
+.cm-host :deep(.cm-gutters) { border-right: 1px solid #1e293b; }
+
+.result-panel { flex: none; border-top: 1px solid #334155; background: #fff; display: flex; flex-direction: column; height: 250px; }
+.result-panel.collapsed { height: auto; }
+.rp-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--border);
+  flex: none;
+}
+.rp-tab {
+  background: none;
+  color: var(--muted);
+  border: none;
+  box-shadow: none;
+  padding: 6px 12px;
+  font-size: 13.5px;
+  border-radius: 8px;
+}
+.rp-tab:hover:not(:disabled) { background: var(--panel-2); box-shadow: none; }
+.rp-tab.active { color: var(--accent); background: var(--accent-soft); font-weight: 700; }
+.rp-badge { font-style: normal; font-size: 11px; background: #e2e8f0; border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.run-btn { background: #16a34a; }
+.run-btn:hover:not(:disabled) { background: #15803d; }
+.submit-btn { background: var(--accent); }
+.submit-btn:hover:not(:disabled) { background: var(--accent-strong); }
+.result-panel .rp-tabs .mini-btn { border-color: var(--border-strong); }
+
+.rp-body { flex: 1; overflow-y: auto; padding: 12px 16px; min-height: 0; }
+.rp-idle { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 13.5px; }
+.rp-pending { display: flex; align-items: center; gap: 10px; height: 100%; justify-content: center; color: var(--accent); font-size: 14px; }
+.spin {
+  width: 15px;
+  height: 15px;
+  border: 2px solid #c7d9ff;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.result-line { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+.result-score strong { color: var(--ok); font-size: 17px; margin: 0 2px; }
+.result-hint { margin-top: 8px; font-size: 12.5px; }
+
+.selftest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.st-label { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.st-area { width: 100%; resize: vertical; font-size: 12.5px; }
+.st-out { margin: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; min-height: 92px; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
+.st-out.bad { border-color: #fecaca; background: var(--danger-soft); }
+.st-out.dim { color: var(--muted); }
+.st-err { margin: 10px 0 0; color: var(--danger); font-size: 12.5px; white-space: pre-wrap; }
+
+.sub-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 0; box-shadow: none; border: none; }
+.sub-table th, .sub-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+.sub-table th { background: var(--panel-2); font-size: 12px; }
+
+.drawer-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  z-index: 90;
+  display: flex;
+}
+.drawer {
+  width: min(430px, 92vw);
+  background: var(--panel);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-lg);
+  animation: slide-in 0.18s ease;
+}
+@keyframes slide-in { from { transform: translateX(-30px); opacity: 0; } }
+.drawer-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.level-strip { display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap; }
+.level-tab { border: 1px solid var(--border); background: #fff; color: var(--muted); box-shadow: none; padding: 7px 11px; font-size: 12.5px; border-radius: 9px; }
+.level-tab:hover { box-shadow: none; background: var(--panel-2); }
 .level-tab.active { background: var(--accent-soft); border-color: #bfd4ff; color: var(--accent-strong); }
-.level-tab small { margin-left: auto; color: inherit; font-size: 12px; }
-.level-dot { width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; }
-.dot-easy { background: #22c55e; }.dot-basic { background: #0ea5e9; }.dot-intermediate { background: #f59e0b; }.dot-hard { background: #ef4444; }
-.all-tab { flex: 0 0 auto; min-width: 110px; }
-.workspace { display: grid; grid-template-columns: 330px minmax(0, 1fr); gap: 16px; min-height: 650px; }
-.panel { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
-.problem-list { overflow: hidden; display: flex; flex-direction: column; }
-.list-toolbar { padding: 13px; display: flex; gap: 8px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
-.list-toolbar input { min-width: 0; flex: 1; width: 0; padding: 8px 10px; }
-.list-toolbar select { width: 100px; padding: 8px 7px; font-size: 12px; }
-.problem-row { width: 100%; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto; gap: 8px; text-align: left; justify-content: initial; background: transparent; color: var(--text); border: 0; border-bottom: 1px solid var(--border); border-radius: 0; box-shadow: none; padding: 12px 13px; font-weight: 500; }
+.level-tab small { margin-left: 5px; opacity: 0.75; }
+.list-toolbar { display: flex; gap: 8px; padding: 12px 16px; }
+.list-toolbar input { flex: 1; min-width: 0; padding: 8px 10px; }
+.list-toolbar select { width: 104px; padding: 8px 7px; font-size: 12px; }
+.drawer-list { flex: 1; overflow-y: auto; border-top: 1px solid var(--border); }
+.problem-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr) auto;
+  gap: 8px;
+  text-align: left;
+  justify-content: initial;
+  background: transparent;
+  color: var(--text);
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+  padding: 12px 16px;
+  font-weight: 500;
+  font-size: 13.5px;
+}
 .problem-row:hover { background: var(--panel-2); box-shadow: none; }
 .problem-row.selected { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
-.problem-no { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+.problem-no { color: var(--muted); font-size: 11px; }
 .problem-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.problem-state { font-size: 11px; color: var(--muted); white-space: nowrap; }
-.problem-state.chip-ok { color: var(--ok); }.problem-state.chip-warn { color: var(--warn); }.problem-state.chip-bad { color: var(--danger); }
-.list-empty { margin: 15px; padding: 25px 10px; }
-.editor { padding: 23px; min-width: 0; }
-.editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
-.editor-head h3 { margin: 2px 0 0; font-size: 20px; }
-.eyebrow { color: var(--accent); font-size: 12px; font-weight: 700; }
-.problem-description { white-space: pre-wrap; line-height: 1.8; margin: 18px 0; }
-.samples { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 18px; }
-.sample-box { border: 1px solid var(--border); border-radius: 9px; background: var(--panel-2); padding: 11px 12px; }
-.sample-label { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
-.sample-io { display: grid; grid-template-columns: 30px 1fr; gap: 7px; margin-top: 5px; }
-.sample-io span { font-size: 11px; color: var(--muted); }.sample-io pre { margin: 0; font: 12px/1.5 Consolas, monospace; white-space: pre-wrap; }
-.code-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
-.code-toolbar select { min-width: 115px; }.code-toolbar .muted { font-size: 12px; }
-.code-editor { width: 100%; min-height: 300px; resize: vertical; font: 13px/1.65 Consolas, Monaco, monospace; background: #0f172a; color: #dbeafe; border-color: #1e293b; border-radius: 9px; padding: 15px; }
-.code-editor:focus { border-color: #60a5fa; box-shadow: 0 0 0 3px rgba(37, 99, 235, .18); }
-.feedback { margin-top: 12px; border-radius: 8px; padding: 10px 12px; font-size: 13px; }
-.feedback-pending { color: var(--accent); background: var(--accent-soft); }.feedback-error { color: var(--danger); background: var(--danger-soft); }
-.best-score { margin-top: 12px; font-size: 13px; color: var(--muted); }.best-score strong { color: var(--ok); font-size: 16px; margin-left: 5px; }
-.empty-detail { display: grid; place-items: center; align-content: center; text-align: center; padding: 40px; }.empty-detail h3 { margin: 10px 0 4px; }.empty-detail p { max-width: 360px; }.empty-icon { color: var(--accent); font-size: 30px; }
-@media (max-width: 860px) { .workspace { grid-template-columns: 1fr; }.problem-list { max-height: 330px; }.editor { min-height: 560px; } }
-@media (max-width: 560px) { .practice-head { align-items: flex-start; }.progress-summary { display: none; }.editor { padding: 16px; }.code-toolbar { flex-wrap: wrap; }.code-toolbar .spacer { display: none; }.code-toolbar button { margin-left: auto; }.level-tab { min-width: 118px; } }
+.problem-state { font-size: 11px; }
+
+.copy-tip {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #0f172a;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 9px;
+  font-size: 13px;
+  z-index: 120;
+}
+
+@media (max-width: 900px) {
+  .wb-body { flex-direction: column; overflow-y: auto; }
+  .wb-left { width: 100% !important; max-width: none; }
+  .wb-splitter { display: none; }
+  .wb-right { min-height: 520px; }
+  .selftest-grid { grid-template-columns: 1fr; }
+  .tb-title strong { max-width: 32vw; }
+}
 </style>

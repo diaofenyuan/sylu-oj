@@ -103,7 +103,8 @@ public class PracticeCatalogService {
 
     public record PracticeProblem(Long problemId, String code, String title, String description,
                                   String difficulty, List<String> languages, Long assignmentTargetId,
-                                  BigDecimal bestScore, String status, List<Sample> samples) {
+                                  BigDecimal bestScore, String status, List<Sample> samples,
+                                  int timeLimitMs, int memoryLimitMb) {
     }
 
     @Transactional
@@ -155,8 +156,11 @@ public class PracticeCatalogService {
                 : List.of();
         String code = problemRepository.findById(snapshot.getProblemId())
                 .map(Problem::getCode).orElse("P" + snapshot.getProblemId());
+        Problem problem = problemRepository.findById(snapshot.getProblemId()).orElse(null);
         return new PracticeProblem(snapshot.getProblemId(), code, snapshot.getTitle(),
-                snapshot.getDescription(), difficultyOf(snapshot), languages, targetId, best, status, samples);
+                snapshot.getDescription(), difficultyOf(snapshot), languages, targetId, best, status, samples,
+                problem == null ? 10000 : problem.getTimeLimitMs(),
+                problem == null ? 256 : problem.getMemoryLimitMb());
     }
 
     private String difficultyOf(ProblemSnapshot snapshot) {

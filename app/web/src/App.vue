@@ -22,7 +22,7 @@
       <div class="spacer"></div>
       <button v-if="authed" class="secondary" @click="logout">退出登录</button>
     </header>
-    <main :class="{ full: isLogin }"><router-view /></main>
+    <main :class="{ full: isLogin, workbench: isWorkbench }"><router-view /></main>
   </div>
 </template>
 
@@ -36,6 +36,7 @@ const router = useRouter()
 const route = useRoute()
 
 const isLogin = computed(() => route.path === '/login' || route.path === '/')
+const isWorkbench = computed(() => route.path.startsWith('/student/practice'))
 // 依赖 route.path 使其在路由变化时重新读取本地缓存
 const role = computed(() => {
   void route.path
@@ -116,4 +117,11 @@ main {
   margin: 0 auto;
 }
 main.full { padding: 0; max-width: none; }
+main.workbench {
+  padding: 0;
+  max-width: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 </style>
