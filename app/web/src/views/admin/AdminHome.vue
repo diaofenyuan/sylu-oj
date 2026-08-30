@@ -11,6 +11,91 @@
       </button>
     </div>
 
+    <!-- 一键开通向导 -->
+    <template v-if="tab === 'wizard'">
+      <div class="card section">
+        <div class="row section-head">
+          <h3>一键开通教学班</h3>
+          <span class="muted">依次完成：学期 → 课程 → 教学班 → 主讲教师 → 学生名单，账号自动开通、学生自动选课</span>
+        </div>
+
+        <div class="wiz-grid">
+          <div class="wiz-block">
+            <h4>1. 学期</h4>
+            <select v-model="wiz.termMode" class="wide">
+              <option v-for="t in terms" :key="t.id" :value="'use:' + t.id">使用：{{ t.name }}</option>
+              <option value="new">+ 新建学期</option>
+            </select>
+            <div v-if="wiz.termMode === 'new'" class="wiz-fields">
+              <input v-model="wiz.term.code" placeholder="学期代码 如 2026S1" />
+              <input v-model="wiz.term.name" placeholder="学期名称" />
+              <div class="row">
+                <input v-model="wiz.term.startDate" type="date" />
+                <span class="muted">至</span>
+                <input v-model="wiz.term.endDate" type="date" />
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-block">
+            <h4>2. 课程</h4>
+            <select v-model="wiz.courseMode" class="wide">
+              <option v-for="c in courses" :key="c.id" :value="'use:' + c.id">使用：{{ c.name }}（{{ c.code }}）</option>
+              <option value="new">+ 新建课程</option>
+            </select>
+            <div v-if="wiz.courseMode === 'new'" class="wiz-fields">
+              <input v-model="wiz.course.code" placeholder="课程代码 如 CS101" />
+              <input v-model="wiz.course.name" placeholder="课程名称" />
+              <input v-model="wiz.course.credit" type="number" step="0.5" min="0" placeholder="学分（默认 1）" />
+            </div>
+          </div>
+
+          <div class="wiz-block">
+            <h4>3. 教学班</h4>
+            <div class="wiz-fields">
+              <input v-model="wiz.classCode" placeholder="班级代码 如 CS101-01" />
+              <input v-model="wiz.className" placeholder="班级名称 如 01班" />
+            </div>
+          </div>
+
+          <div class="wiz-block">
+            <h4>4. 主讲教师</h4>
+            <select v-model="wiz.teacherMode" class="wide">
+              <option v-for="t in teachers" :key="t.id" :value="'use:' + t.id">使用：{{ t.name }}（{{ t.staffNo }}）</option>
+              <option value="new">+ 新建教师（自动开通登录账号）</option>
+            </select>
+            <div v-if="wiz.teacherMode === 'new'" class="wiz-fields">
+              <div class="row">
+                <input v-model="wiz.teacher.staffNo" placeholder="工号 如 T2026002" />
+                <input v-model="wiz.teacher.name" placeholder="姓名" />
+              </div>
+              <div class="row">
+                <input v-model="wiz.teacher.login" placeholder="登录账号（默认=工号）" />
+                <input v-model="wiz.teacher.password" placeholder="初始密码" />
+              </div>
+            </div>
+          </div>
+
+          <div class="wiz-block wiz-full">
+            <h4>5. 学生名单</h4>
+            <textarea v-model="wiz.studentsText" rows="6" placeholder="每行一个学生，格式：学号,姓名&#10;20260001,张三&#10;20260002,李四"></textarea>
+            <div class="row" style="margin-top: 10px;">
+              <label class="chk"><input type="checkbox" v-model="wiz.stuAccount" /> 同时开通学生登录账号</label>
+              <input v-if="wiz.stuAccount" v-model="wiz.stuPassword" placeholder="学生初始密码" class="slim" />
+            </div>
+          </div>
+        </div>
+
+        <div class="row" style="margin-top: 16px;">
+          <button :disabled="wizRunning" @click="runWizard">{{ wizRunning ? '开通中…' : '一键开通' }}</button>
+          <span class="muted">已选 {{ wizardStudentCount }} 名学生</span>
+        </div>
+        <div v-if="wizLog.length" class="wiz-log">
+          <div v-for="(l, i) in wizLog" :key="i" :class="{ bad: l.startsWith('✕') }">{{ l }}</div>
+        </div>
+      </div>
+    </template>
+
     <!-- 教学组织 -->
     <template v-if="tab === 'org'">
       <div class="card section">
@@ -212,10 +297,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { api } from '../../api'
 
 const tabs = [
+  { key: 'wizard', label: '一键开通' },
   { key: 'org', label: '教学组织' },
   { key: 'people', label: '教师与学生' },
   { key: 'assign', label: '授课与选课' },
@@ -248,6 +334,27 @@ const assignRole = ref('PRIMARY')
 const enrollStudentId = ref('')
 const enrollTransfer = ref(false)
 const auditLimit = ref(50)
+
+const defaultTermStart = new Date().toISOString().slice(0, 10)
+const defaultTermEnd = new Date(Date.now() + 120 * 86400000).toISOString().slice(0, 10)
+const wiz = ref({
+  termMode: 'new',
+  term: { code: '', name: '', startDate: defaultTermStart, endDate: defaultTermEnd },
+  courseMode: 'new',
+  course: { code: '', name: '', credit: '' },
+  classCode: '',
+  className: '',
+  teacherMode: 'new',
+  teacher: { staffNo: '', name: '', login: '', password: 'Teacher@123456' },
+  studentsText: '',
+  stuAccount: true,
+  stuPassword: 'Student@123456'
+})
+const wizRunning = ref(false)
+const wizLog = ref([])
+const wizardStudentCount = computed(() =>
+  wiz.value.studentsText.split('\n').map(s => s.trim()).filter(Boolean).length
+)
 
 onMounted(async () => {
   await Promise.all([loadTerms(), loadMajors(), loadCourses(), loadClasses(), loadTeachers(), loadStudents(), loadAudit()])
@@ -378,6 +485,35 @@ tr:last-child td { border-bottom: none; }
 .assign-block { margin-bottom: 24px; }
 .assign-block:last-child { margin-bottom: 0; }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); }
+.wiz-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 24px;
+}
+.wiz-block {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  background: var(--panel-2);
+}
+.wiz-block h4 { margin: 0 0 10px; font-size: 14px; color: var(--accent); }
+.wiz-full { grid-column: 1 / -1; }
+.wiz-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.wiz-fields input { width: 100%; }
+.wide { width: 100%; }
+.wiz-block textarea { width: 100%; resize: vertical; font-family: inherit; }
+.wiz-log {
+  margin-top: 14px;
+  background: #0f172a;
+  color: #d7e3f4;
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-size: 13px;
+  font-family: Consolas, monospace;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.wiz-log .bad { color: #fca5a5; }
 .msg {
   position: fixed;
   bottom: 26px;

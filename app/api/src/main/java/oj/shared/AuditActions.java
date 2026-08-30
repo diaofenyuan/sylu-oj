@@ -27,6 +27,7 @@ public final class AuditActions {
 
     // 作业
     public static final String ASSIGNMENT_CREATED = "ASSIGNMENT_CREATED";
+    public static final String ASSIGNMENT_UPDATED = "ASSIGNMENT_UPDATED";
     public static final String ASSIGNMENT_PUBLISHED = "ASSIGNMENT_PUBLISHED";
     public static final String ASSIGNMENT_TARGET_WITHDRAWN = "ASSIGNMENT_TARGET_WITHDRAWN";
     public static final String TARGET_RULES_UPDATED = "TARGET_RULES_UPDATED";

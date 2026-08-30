@@ -95,6 +95,11 @@ public class Assignment {
         this.status = Status.PUBLISHED;
     }
 
+    public void updateComposition(String newTitle, Mode newMode) {
+        this.title = newTitle;
+        this.mode = newMode;
+    }
+
     public void withdraw() {
         this.status = Status.WITHDRAWN;
     }

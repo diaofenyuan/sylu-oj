@@ -115,8 +115,53 @@ public class AssignmentService {
         return assignment;
     }
 
-    private void validateWeights(List<CompositionItem> items) {
-        BigDecimal sum = BigDecimal.ZERO;
+    /**
+     * 更新草稿试卷：仅创建者（或管理员）可改，且仅 DRAFT 状态允许；
+     * 组卷明细整体重写，校验规则与创建一致。
+     */
+    @Transactional
+    public Assignment updateAssignment(Long assignmentId, String title, Assignment.Mode mode,
+                                       List<CompositionItem> items) {
+        CurrentUser user = accessGuard.requireAdminOrTeacher();
+        Assignment assignment = requireAssignment(assignmentId);
+        requireCreator(assignment, user);
+        if (assignment.getStatus() != Assignment.Status.DRAFT) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "仅草稿状态的试卷可以修改");
+        }
+        if (items == null || items.isEmpty()) {
+            throw new ApiException(ErrorCode.EMPTY_COMPOSITION);
+        }
+        validateWeights(items);
+        Set<Long> problemIds = new HashSet<>();
+        for (CompositionItem item : items) {
+            if (!problemIds.add(item.problemId())) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED, "作业内题目重复");
+            }
+        }
+        long publishedCount = problemService.countPublishedByIds(problemIds);
+        if (publishedCount != problemIds.size()) {
+            throw new ApiException(ErrorCode.PROBLEM_NOT_PUBLISHED);
+        }
+        if (user.isTeacher()) {
+            for (Long problemId : problemIds) {
+                problemService.requireAccessibleProblem(problemId, user);
+            }
+        }
+        assignment.updateComposition(title, mode);
+        assignmentProblemRepository.deleteByAssignmentId(assignmentId);
+        int order = 1;
+        for (CompositionItem item : items) {
+            assignmentProblemRepository.save(new AssignmentProblem(
+                    assignmentId, item.problemId(), order++, item.weight()));
+        }
+        auditService.record(AuditActions.ASSIGNMENT_UPDATED, "ASSIGNMENT",
+                String.valueOf(assignmentId),
+                null,
+                Map.of("title", title, "mode", mode.name(), "itemCount", items.size()));
+        return assignment;
+    }
+
+    private void validateWeights(List<CompositionItem> items) {        BigDecimal sum = BigDecimal.ZERO;
         for (CompositionItem item : items) {
             BigDecimal weight = item.weight();
             if (weight == null || weight.compareTo(BigDecimal.ZERO) <= 0

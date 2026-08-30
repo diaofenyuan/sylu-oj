@@ -215,6 +215,17 @@ public class TeacherController {
                 "mode", assignment.getMode().name());
     }
 
+    @PutMapping("/assignments/{id}")
+    public Map<String, Object> updateAssignment(@PathVariable Long id,
+                                                @Valid @RequestBody AssignmentRequest request) {
+        List<AssignmentService.CompositionItem> items = request.items().stream()
+                .map(i -> new AssignmentService.CompositionItem(i.problemId(), i.weight()))
+                .toList();
+        Assignment assignment = assignmentService.updateAssignment(id, request.title(), request.mode(), items);
+        return Map.of("id", assignment.getId(), "status", assignment.getStatus().name(),
+                "mode", assignment.getMode().name());
+    }
+
     @GetMapping("/assignments")
     public List<Map<String, Object>> myAssignments() {
         var user = accessGuard.requireTeacher();
