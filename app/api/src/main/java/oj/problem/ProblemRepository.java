@@ -14,6 +14,10 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
     boolean existsByProblemBankIdAndCode(Long problemBankId, String code);
 
+    boolean existsByProblemBankIdAndTitle(Long problemBankId, String title);
+
+    boolean existsByProblemBankIdAndTitleAndIdNot(Long problemBankId, String title, Long id);
+
     List<Problem> findByIdIn(Collection<Long> ids);
 
     long countByIdInAndStatus(Collection<Long> ids, Problem.Status status);

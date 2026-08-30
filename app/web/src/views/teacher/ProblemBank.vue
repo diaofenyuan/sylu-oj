@@ -18,7 +18,8 @@
         </select>
         <button @click="create">创建题目</button>
       </div>
-      <p class="muted hint">创建后可在题目详情中维护公开样例与隐藏用例。</p>
+      <p class="muted hint">创建后可在题目详情中维护公开样例与隐藏用例。同一题库内题号、题名均不可重复。</p>
+      <div v-if="errMsg" class="err-banner">{{ errMsg }}</div>
     </div>
 
     <table v-if="problems.length">
@@ -53,6 +54,8 @@ const route = useRoute()
 const classId = route.params.classId
 const problems = ref([])
 const form = ref({ code: '', title: '', language: 'CPP' })
+const errMsg = ref('')
+let bankId = null
 
 const STATUS = { DRAFT: '草稿', PUBLISHED: '已发布' }
 function statusText(s) {
@@ -61,7 +64,7 @@ function statusText(s) {
 
 async function load() {
   const banks = await api(`/teacher/problem-banks?teachingClassId=${classId}`)
-  let bankId = banks[0]?.id
+  bankId = banks[0]?.id
   if (!bankId) {
     const bank = await api('/teacher/problem-banks', {
       method: 'POST', body: { teachingClassId: Number(classId), name: '默认题库' }
@@ -72,18 +75,36 @@ async function load() {
 }
 
 async function create() {
-  const banks = await api(`/teacher/problem-banks?teachingClassId=${classId}`)
-  await api('/teacher/problems', {
-    method: 'POST',
-    body: {
-      bankId: banks[0].id, code: form.value.code, title: form.value.title,
-      languages: [form.value.language],
-      testcases: [{ orderNum: 1, sample: true, input: '1 2', expectedOutput: '3', score: 10 }]
-    }
-  })
-  form.value.code = ''
-  form.value.title = ''
-  await load()
+  errMsg.value = ''
+  const code = form.value.code.trim()
+  const title = form.value.title.trim()
+  if (!code || !title) {
+    errMsg.value = '题号与题名均为必填'
+    return
+  }
+  if (problems.value.some(p => p.code === code)) {
+    errMsg.value = `题号「${code}」已存在于当前题库`
+    return
+  }
+  if (problems.value.some(p => p.title === title)) {
+    errMsg.value = `题名「${title}」已存在于当前题库`
+    return
+  }
+  try {
+    await api('/teacher/problems', {
+      method: 'POST',
+      body: {
+        bankId, code, title,
+        languages: [form.value.language],
+        testcases: [{ orderNum: 1, sample: true, input: '1 2', expectedOutput: '3', score: 10 }]
+      }
+    })
+    form.value.code = ''
+    form.value.title = ''
+    await load()
+  } catch (e) {
+    errMsg.value = e.message
+  }
 }
 
 async function publish(id) {
@@ -96,6 +117,15 @@ onMounted(load)
 
 <style scoped>
 .hint { margin: 12px 0 0; font-size: 13px; }
+.err-banner {
+  background: var(--danger-soft);
+  color: var(--danger);
+  border: 1px solid #fecaca;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13.5px;
+  margin-top: 12px;
+}
 td code {
   background: var(--panel-2);
   border: 1px solid var(--border);

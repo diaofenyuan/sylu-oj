@@ -82,16 +82,21 @@ public class ProblemService {
         if (user.isTeacher()) {
             classroomService.requireActiveAssignment(user.teacherId(), bank.getTeachingClassId());
         }
-        if (problemRepository.existsByProblemBankIdAndCode(bankId, code)) {
-            throw new ApiException(ErrorCode.CODE_CONFLICT);
+        String normalizedCode = requireText(code, "题目编号不能为空");
+        String normalizedTitle = requireText(title, "题目标题不能为空");
+        if (problemRepository.existsByProblemBankIdAndCode(bankId, normalizedCode)) {
+            throw new ApiException(ErrorCode.CODE_CONFLICT, "题目编号已存在于该题库：" + normalizedCode);
+        }
+        if (problemRepository.existsByProblemBankIdAndTitle(bankId, normalizedTitle)) {
+            throw new ApiException(ErrorCode.CODE_CONFLICT, "题目标题已存在于该题库：" + normalizedTitle);
         }
         String languageString = normalizeLanguages(languages);
-        Problem problem = problemRepository.save(new Problem(bankId, code, title, description,
-                languageString, "EASY", timeLimitMs, memoryLimitMb, outputLimitKb, maxScore,
+        Problem problem = problemRepository.save(new Problem(bankId, normalizedCode, normalizedTitle,
+                description, languageString, "EASY", timeLimitMs, memoryLimitMb, outputLimitKb, maxScore,
                 user.isTeacher() ? user.teacherId() : 0L));
         saveTestcases(problem, testcases == null ? List.of() : testcases);
         auditService.record(AuditActions.PROBLEM_CREATED, "PROBLEM", String.valueOf(problem.getId()),
-                null, Map.of("bankId", bankId, "code", code, "version", problem.getVersion()));
+                null, Map.of("bankId", bankId, "code", normalizedCode, "version", problem.getVersion()));
         return problem;
     }
 
@@ -107,7 +112,12 @@ public class ProblemService {
                 "timeLimitMs", problem.getTimeLimitMs(),
                 "memoryLimitMb", problem.getMemoryLimitMb());
         if (title != null) {
-            problem.updateTitle(title);
+            String normalizedTitle = requireText(title, "题目标题不能为空");
+            if (problemRepository.existsByProblemBankIdAndTitleAndIdNot(
+                    problem.getProblemBankId(), normalizedTitle, problem.getId())) {
+                throw new ApiException(ErrorCode.CODE_CONFLICT, "题目标题已存在于该题库：" + normalizedTitle);
+            }
+            problem.updateTitle(normalizedTitle);
         }
         if (description != null) {
             problem.updateDescription(description);
@@ -226,6 +236,13 @@ public class ProblemService {
             order++;
         }
         testcaseRepository.saveAll(rows);
+    }
+
+    private String requireText(String value, String message) {
+        if (value == null || value.trim().isEmpty()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, message);
+        }
+        return value.trim();
     }
 
     private String normalizeLanguages(List<String> languages) {
