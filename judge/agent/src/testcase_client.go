@@ -9,7 +9,7 @@
 //   - 信封密钥由 Agent 身份与其注册密钥派生
 //     （SHA-256("oj-testdata-v1|<agentId>|<secret>")，与 Java 端一致），
 //     Agent 无需持有任何共享主密钥。
-package agent
+package main
 
 import (
 	"bytes"
@@ -155,30 +155,113 @@ func envelopeKey(agentID, secret string) []byte {
 }
 
 func (c *TestcaseClient) post(path string, payload []byte) ([]byte, error) {
+	body, _, err := c.postWithStatus(path, payload)
+	return body, err
+}
+
+// postWithStatus 返回原始状态码：长轮询领取用 204 表示无可领取任务。
+func (c *TestcaseClient) postWithStatus(path string, payload []byte) ([]byte, int, error) {
 	var reader io.Reader
 	if payload != nil {
 		reader = bytes.NewReader(payload)
 	}
 	req, err := http.NewRequest(http.MethodPost, c.baseURL+path, reader)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	req.Header.Set("X-Agent-Id", c.agentID)
 	req.Header.Set("X-Agent-Token", c.secret)
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	defer resp.Body.Close()
 	body, err := io.ReadAll(io.LimitReader(resp.Body, c.maxBytes))
 	if err != nil {
-		return nil, err
+		return nil, resp.StatusCode, err
 	}
 	if resp.StatusCode >= 400 {
-		return nil, fmt.Errorf("gateway 返回 %d", resp.StatusCode)
+		return body, resp.StatusCode, fmt.Errorf("gateway 返回 %d", resp.StatusCode)
 	}
-	return body, nil
+	return body, resp.StatusCode, nil
+}
+
+// ---- 判题任务与结果（Task 7，与 judge-gateway.openapi.yaml 对齐） ----
+
+// TaskScore 为服务端下发的每用例分值（Agent 不得自行加权）。
+type TaskScore struct {
+	Order int     `json:"order"`
+	Score float64 `json:"score"`
+}
+
+// Task 是 JudgeTask 载荷：代码、语言运行时标识与用例引用，不含测试数据与任何凭据。
+type Task struct {
+	TaskUuid        string      `json:"taskUuid"`
+	SubmissionId    int64       `json:"submissionId"`
+	Attempt         int         `json:"attempt"`
+	ProblemId       int64       `json:"problemId"`
+	SnapshotVersion int         `json:"snapshotVersion"`
+	Language        string      `json:"language"`
+	LanguageRuntime string      `json:"languageRuntime"`
+	JudgeConfig     string      `json:"judgeConfig"`
+	Code            string      `json:"code"`
+	TestcaseRefs    []int       `json:"testcaseRefs"`
+	TestcaseScores  []TaskScore `json:"testcaseScores"`
+	LeaseExpiresAt  string      `json:"leaseExpiresAt"`
+}
+
+// CaseOutcome 为单个测试点结果。
+type CaseOutcome struct {
+	Order    int     `json:"order"`
+	Status   string  `json:"status"`
+	Score    float64 `json:"score"`
+	TimeMs   int64   `json:"timeMs"`
+	MemoryKb int64   `json:"memoryKb"`
+}
+
+// CaseResultSubmission 为结果回传体；Score 必须为两位小数（与签名 canonical 一致）。
+type CaseResultSubmission struct {
+	ResultCode      string        `json:"resultCode"`
+	NormalizedScore string        `json:"normalizedScore"`
+	TotalTimeMs     int64         `json:"totalTimeMs"`
+	PeakMemoryKb    int64         `json:"peakMemoryKb"`
+	ResultVersion   int           `json:"resultVersion"`
+	SandboxMode     string        `json:"sandboxMode,omitempty"`
+	FallbackNotice  string        `json:"fallbackNotice,omitempty"`
+	Testcases       []CaseOutcome `json:"testcases"`
+	Signature       string        `json:"signature"`
+}
+
+// ClaimTask 长轮询领取一个任务；无任务（204）返回 nil。
+func (c *TestcaseClient) ClaimTask(waitSeconds int) (*Task, error) {
+	body, status, err := c.postWithStatus("/tasks/claim",
+		[]byte(fmt.Sprintf(`{"waitSeconds":%d}`, waitSeconds)))
+	if err != nil {
+		return nil, err
+	}
+	if status == 204 || len(bytes.TrimSpace(body)) == 0 {
+		return nil, nil
+	}
+	var task Task
+	if err := json.Unmarshal(body, &task); err != nil {
+		return nil, fmt.Errorf("任务载荷解析失败: %w", err)
+	}
+	return &task, nil
+}
+
+// SubmitResult 回传带 HMAC 签名的结果；signature 字段在发送前由本方法填充。
+func (c *TestcaseClient) SubmitResult(taskUuid string, sub *CaseResultSubmission) error {
+	if sub.Signature == "" {
+		sub.Signature = c.ResultSignature(taskUuid, sub.ResultCode, sub.NormalizedScore,
+			sub.TotalTimeMs, sub.PeakMemoryKb, sub.ResultVersion)
+	}
+	payload, err := json.Marshal(sub)
+	if err != nil {
+		return err
+	}
+	_, _, err = c.postWithStatus("/tasks/"+taskUuid+"/result", payload)
+	return err
 }
 
 func zero(b []byte) {

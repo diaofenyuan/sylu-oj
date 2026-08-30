@@ -1,0 +1,27 @@
+# 恶意样例清单（Task 7，设计 6.2 / 11 节第 5 条）
+# 每个 malicious 样例在 Linux 判题主机上经 Agent 沙箱实际执行（live 段），
+# 断言其结果码落入预期集合且宿主机资源/数据不受影响（隔离前后对照）。
+# 在 Windows 开发环境 bats 仅执行静态断言；live 段需 OJ_SANDBOX_LIVE=1。
+version: 1
+programs:
+  fork_bomb.c:      { language: C,      expect: [RE, TLE], reason: pids.max 抑制 fork bomb }
+  fork_bomb.py:     { language: PYTHON, expect: [RE, TLE], reason: pids.max 抑制 }
+  ForkBomb.java:    { language: JAVA,   expect: [RE, TLE], reason: pids.max 抑制线程进程 }
+  disk_fill.c:      { language: C,      expect: [RE],      reason: 写层容量/ulimit fsize 触顶 }
+  disk_fill.py:     { language: PYTHON, expect: [RE],      reason: 同上 }
+  infinite_loop.c:  { language: C,      expect: [TLE],     reason: 墙钟超时 }
+  infinite_loop.py: { language: PYTHON, expect: [TLE],     reason: 墙钟超时 }
+  InfiniteLoop.java:{ language: JAVA,   expect: [TLE],     reason: 墙钟超时 }
+  network_probe.c:  { language: C,      expect: [BSC, RE], reason: seccomp 拒绝 socket() }
+  network_probe.py: { language: PYTHON, expect: [BSC, RE], reason: 无网络路径可达（含元数据地址） }
+  path_traversal.c: { language: C,      expect: [RE, WA],  reason: 只读根文件系统 + 最小文件树，无数据可读 }
+  metadata_probe.py:{ language: PYTHON, expect: [RE, WA],  reason: 169.254.169.254 不可达 }
+  host_dir_probe.c: { language: C,      expect: [RE, WA],  reason: 宿主机 /proc/cgroup 不可见不可写 }
+  docker_socket_probe.py: { language: PYTHON, expect: [RE, WA], reason: 容器运行时 Socket 不可达 }
+  oom.c:            { language: C,      expect: [MLE],     reason: memory.max 触发 OOM Kill }
+  ptrace_probe.c:   { language: C,      expect: [BSC, RE], reason: seccomp 拒绝 ptrace }
+benign:
+  aplusb.c:   { language: C,      expect: [AC], input: "1 2", expected: "3" }
+  aplusb.cpp: { language: CPP,    expect: [AC], input: "10 20", expected: "30" }
+  aplusb.py:  { language: PYTHON, expect: [AC], input: "3 4", expected: "7" }
+  APlusB.java:{ language: JAVA,   expect: [AC], input: "5 6", expected: "11" }

@@ -185,6 +185,15 @@ components:
           type: array
           description: 当前任务用例序号引用（不含数据内容，不含任何凭据）
           items: { type: integer, minimum: 1 }
+        testcaseScores:
+          type: array
+          description: 每个用例的分值（Agent 据此汇总归一化得分，不得自行加权）
+          items:
+            type: object
+            required: [order, score]
+            properties:
+              order: { type: integer, minimum: 1 }
+              score: { type: number, minimum: 0 }
         leaseExpiresAt: { type: string, format: date-time }
     TestcaseEnvelope:
       type: object

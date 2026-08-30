@@ -76,10 +76,13 @@ public class JudgeTaskService {
         this.leaseSeconds = leaseSeconds;
     }
 
+    public record TaskScore(int order, java.math.BigDecimal score) {
+    }
+
     public record TaskPayload(String taskUuid, Long submissionId, int attempt, Long problemId,
                               int snapshotVersion, String language, String languageRuntime,
                               String judgeConfig, String code, List<Integer> testcaseRefs,
-                              String leaseExpiresAt) {
+                              List<TaskScore> testcaseScores, String leaseExpiresAt) {
     }
 
     /**
@@ -173,13 +176,15 @@ public class JudgeTaskService {
     public TaskPayload buildPayload(JudgeTask task) {
         Submission submission = submissionRepository.findById(task.getSubmissionId())
                 .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR, "任务对应提交缺失"));
-        List<Integer> orders = testcaseRepository
-                .findByTestcaseSetIdOrderByOrderNumAsc(task.getTestcaseSetId()).stream()
-                .map(oj.problem.Testcase::getOrderNum).toList();
+        List<oj.problem.Testcase> cases = testcaseRepository
+                .findByTestcaseSetIdOrderByOrderNumAsc(task.getTestcaseSetId());
+        List<Integer> orders = cases.stream().map(oj.problem.Testcase::getOrderNum).toList();
+        List<TaskScore> scores = cases.stream()
+                .map(t -> new TaskScore(t.getOrderNum(), t.getScore())).toList();
         return new TaskPayload(task.getTaskUuid(), task.getSubmissionId(), task.getAttempt(),
                 task.getProblemId(), task.getSnapshotVersion(), task.getLanguage(),
                 task.getLanguageRuntime(), snapshotJudgeConfig(task.getSnapshotId()),
-                submission.getCode(), orders,
+                submission.getCode(), orders, scores,
                 task.getLeaseExpiresAt() == null ? null : task.getLeaseExpiresAt().toString());
     }
 

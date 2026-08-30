@@ -1,0 +1,56 @@
+{
+  "defaultAction": "SCMP_ACT_ERRNO",
+  "architectures": ["SCMP_ARCH_X86_64", "SCMP_ARCH_X86", "SCMP_ARCH_X32"],
+  "comment": "判题沙箱 seccomp 白名单（Task 7，设计 6.2）。默认拒绝；socket/connect/accept 等网络系统调用、mount/umount、ptrace、keyctl、bpf、userfaultfd、kexec、reboot、swapon/off、setns、unshare、clone 带 NEWUSER/NEWNS 标志等一律拒绝。允许 clone（线程创建，Java/Python 运行时必需）。Java JVM 需要的少量额外调用（memfd_create、eventfd2、timerfd、sched_getaffinity 等）已包含。",
+  "syscalls": [
+    {
+      "names": [
+        "read", "readv", "pread64", "preadv", "preadv2",
+        "write", "writev", "pwrite64",
+        "open", "openat", "openat2", "close", "close_range",
+        "stat", "fstat", "lstat", "newfstatat", "statx", "statfs", "fstatfs",
+        "lseek", "llseek",
+        "access", "faccessat", "faccessat2", "readlink", "readlinkat", "getcwd",
+        "dup", "dup2", "dup3", "fcntl",
+        "ioctl",
+        "poll", "ppoll", "select", "pselect6",
+        "mmap", "munmap", "mprotect", "mremap", "madvise", "brk", "sbrk",
+        "mincore", "msync",
+        "clone", "clone3", "fork", "vfork", "execve", "execveat",
+        "wait4", "waitid", "waitpid",
+        "exit", "exit_group", "_exit",
+        "rt_sigaction", "rt_sigprocmask", "rt_sigreturn", "rt_sigpending",
+        "rt_sigtimedwait", "rt_sigsuspend", "sigaltstack", "kill", "tgkill",
+        "set_tid_address", "set_robust_list", "get_robust_list", "rseq",
+        "futex", "getpid", "getppid", "gettid", "getuid", "geteuid",
+        "getgid", "getegid", "getresuid", "getresgid", "getgroups",
+        "clock_gettime", "clock_nanosleep", "clock_getres", "gettimeofday",
+        "nanosleep", "time", "alarm", "pause",
+        "getrusage", "getrlimit", "prlimit64",
+        "sched_getaffinity", "sched_yield", "sched_getscheduler", "sched_get_priority_max", "sched_get_priority_min",
+        "getrandom", "sysinfo", "uname", "arch_prctl",
+        "getdents", "getdents64",
+        "pipe", "pipe2", "eventfd", "eventfd2", "memfd_create",
+        "timerfd_create", "timerfd_settime", "timerfd_gettime",
+        "epoll_create", "epoll_create1", "epoll_ctl", "epoll_wait", "epoll_pwait",
+        "restart_syscall", "prctl", "setrlimit", "umask", "chdir", "fchdir",
+        "unlink", "unlinkat", "rename", "renameat", "renameat2", "mkdir", "mkdirat",
+        "rmdir", "truncate", "ftruncate", "fsync", "fdatasync", "sync_file_range",
+        "copy_file_range", "sendfile",
+        "gethostname", "syslog"
+      ],
+      "action": "SCMP_ACT_ALLOW"
+    },
+    {
+      "names": ["prctl"],
+      "action": "SCMP_ACT_ALLOW"
+    }
+  ],
+  "seccomp_errno_for_denied": 13,
+  "notes": [
+    "被拒绝的系统调用返回 EPERM(13) 而非杀死进程：正常程序不应触发；",
+    "恶意探测（socket/connect/mount/ptrace 等）会失败并由 Agent 将",
+    "频繁 SIGSYS/EPERM 探测样本映射为 BSC（受限系统调用）并记安全审计。",
+    "no_new_privs 由沙箱运行时强制设置，本文件不依赖被测程序配合。"
+  ]
+}

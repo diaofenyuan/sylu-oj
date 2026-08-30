@@ -1,0 +1,115 @@
+# 判题语言运行时策略（Task 7，设计 6.2）
+# 镜像一律使用不可变摘要（image@sha256:...）；摘要由 Task 3 的镜像构建
+# 流水线生成并经签名发布包分发，部署时注入本文件，禁止使用 latest 标签。
+#
+# 规则：
+#   - compile.argv / run.argv 是服务端白名单参数向量，禁止 Shell 拼接；
+#     用户代码仅以固定文件名注入，文件名不得进入参数以外的位置。
+#   - limits 为每题快照未覆盖时的默认值；题目快照 judge_config 的
+#     timeLimitMs/memoryLimitMb/outputLimitKb 收窄编译/运行上限。
+#   - C/C++ 与 Java 分编译、运行两个阶段，各自创建一次性沙箱并分别记录
+#     资源指标；Python 直接运行。
+version: 1
+runtimes:
+  gcc-13.3-c17:
+    image: registry.oj.internal/judge/toolchain-c@sha256:REQUIRED_FROM_RELEASE
+  gcc-13.3-c++20:
+    image: registry.oj.internal/judge/toolchain-cpp@sha256:REQUIRED_FROM_RELEASE
+  cpython-3.12:
+    image: registry.oj.internal/judge/toolchain-python@sha256:REQUIRED_FROM_RELEASE
+  openjdk-21:
+    image: registry.oj.internal/judge/toolchain-java@sha256:REQUIRED_FROM_RELEASE
+
+languages:
+  C:
+    runtime: gcc-13.3-c17
+    compile:
+      argv: ["gcc", "-O2", "-std=c17", "-pipe", "-o", "main", "main.c"]
+      source: main.c
+      product: main
+      wallClockSec: 15
+      cpuTimeSec: 10
+      memoryKb: 1048576
+      pids: 64
+      diskKb: 65536
+      outputBytes: 65536
+    run:
+      argv: ["./main"]
+      wallClockSec: 10
+      cpuTimeSec: 8
+      memoryKb: 524288
+      pids: 64
+      diskKb: 32768
+      outputBytes: 1048576
+  CPP:
+    runtime: gcc-13.3-c++20
+    compile:
+      argv: ["g++", "-O2", "-std=c++20", "-pipe", "-o", "main", "main.cpp"]
+      source: main.cpp
+      product: main
+      wallClockSec: 20
+      cpuTimeSec: 15
+      memoryKb: 1048576
+      pids: 64
+      diskKb: 65536
+      outputBytes: 65536
+    run:
+      argv: ["./main"]
+      wallClockSec: 10
+      cpuTimeSec: 8
+      memoryKb: 524288
+      pids: 64
+      diskKb: 32768
+      outputBytes: 1048576
+  PYTHON:
+    runtime: cpython-3.12
+    compile: null
+    run:
+      argv: ["python3", "-I", "-S", "main.py"]
+      source: main.py
+      wallClockSec: 10
+      cpuTimeSec: 8
+      memoryKb: 524288
+      pids: 64
+      diskKb: 32768
+      outputBytes: 1048576
+  JAVA:
+    runtime: openjdk-21
+    compile:
+      argv: ["javac", "-proc:none", "-J-XX:+UseSerialGC", "Main.java"]
+      source: Main.java
+      product: "*.class"
+      wallClockSec: 25
+      cpuTimeSec: 20
+      memoryKb: 2097152
+      pids: 256
+      diskKb: 131072
+      outputBytes: 131072
+    run:
+      argv: ["java", "-XX:+UseSerialGC", "-Xss64m", "-XX:MaxRAMPercentage=80", "Main"]
+      wallClockSec: 12
+      cpuTimeSec: 10
+      memoryKb: 1048576
+      pids: 256
+      diskKb: 65536
+      outputBytes: 1048576
+
+# 全局硬性规则（不得被题目快照放宽）：
+global:
+  sandbox:
+    network: none
+    rootfsReadOnly: true
+    writeLayer: tmpfs
+    nonRoot: true
+    noNewPrivileges: true
+    capabilities: none
+    seccompProfile: seccomp.json
+    apparmorProfile: oj-judge-sandbox
+    forbiddenMounts:
+      - /var/run/docker.sock
+      - /var/run/crio/crio.sock
+      - /proc
+      - /
+  # 输出上限（outputLimitKb）之外，进程树/静态链接限制：
+  staticLinking: disallow          # 运行产物必须动态链接镜像内 libc（防携带二进制逃逸面）
+  maxProcessTree: 256              # pids.max 硬上限（fork bomb 抑制）
