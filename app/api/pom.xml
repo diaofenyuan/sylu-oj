@@ -46,6 +46,16 @@
       <artifactId>spring-boot-starter-amqp</artifactId>
     </dependency>
 
+    <!-- 监控（Task 8）：独立管理端口 9091 暴露 /actuator/prometheus，仅供 OPS 抓取 -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.micrometer</groupId>
+      <artifactId>micrometer-registry-prometheus</artifactId>
+    </dependency>
+
     <!-- Schema migration -->
     <dependency>
       <groupId>org.flywaydb</groupId>

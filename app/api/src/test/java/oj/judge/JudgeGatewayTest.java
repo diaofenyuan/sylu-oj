@@ -137,8 +137,8 @@ class JudgeGatewayTest extends TestSupport {
                                                                  List<JudgeResultGatewayService.GatewayTestcaseOutcome> tcs) {
         String canonical = taskUuid + "|" + code + "|" + score + "|12|300|" + version;
         return resultGatewayService.record(new JudgeResultGatewayService.GatewayResultCommand(
-                taskUuid, AGENT, code, new BigDecimal(score), 12, 300, version, null, tcs,
-                sign(canonical)));
+                taskUuid, AGENT, code, new BigDecimal(score), 12, 300, version, null, "firecracker",
+                tcs, sign(canonical)));
     }
 
     private List<JudgeResultGatewayService.GatewayTestcaseOutcome> acTestcases() {
@@ -256,7 +256,7 @@ class JudgeGatewayTest extends TestSupport {
         assertThatThrownBy(() -> resultGatewayService.record(
                 new JudgeResultGatewayService.GatewayResultCommand(
                         payload.taskUuid(), AGENT, "AC", new BigDecimal("100.00"), 12, 300, 1, null,
-                        acTestcases(), "deadbeef")))
+                        "firecracker", acTestcases(), "deadbeef")))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.RESULT_SIGNATURE_INVALID);
@@ -285,7 +285,7 @@ class JudgeGatewayTest extends TestSupport {
         assertThatThrownBy(() -> resultGatewayService.record(
                 new JudgeResultGatewayService.GatewayResultCommand(
                         payload.taskUuid(), AGENT, "AC", new BigDecimal("100.00"), 999999999L, 300, 1, null,
-                        acTestcases(), sign(canonical))))
+                        "firecracker", acTestcases(), sign(canonical))))
                 .isInstanceOf(ApiException.class)
                 .extracting(e -> ((ApiException) e).errorCode())
                 .isEqualTo(ErrorCode.RESULT_LIMIT_INVALID);
@@ -358,7 +358,7 @@ class JudgeGatewayTest extends TestSupport {
             assertThatThrownBy(() -> resultGatewayService.record(
                     new JudgeResultGatewayService.GatewayResultCommand(
                             payload.taskUuid(), "agent-other", "AC", new BigDecimal("100.00"), 12, 300, 1, null,
-                            acTestcases(), otherSig)))
+                            "firecracker", acTestcases(), otherSig)))
                     .isInstanceOf(ApiException.class)
                     .extracting(e -> ((ApiException) e).errorCode())
                     .isEqualTo(ErrorCode.TASK_NOT_CLAIMABLE);

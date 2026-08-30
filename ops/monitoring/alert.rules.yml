@@ -1,0 +1,110 @@
+# 告警规则（Task 8，设计 10.2）
+# 分级：P1 立即处置（15 分钟内响应）；P2 当日处置并复盘。
+groups:
+  - name: oj-critical
+    rules:
+      # 日志断流 5 分钟 → P1（设计 10.1：断流 5 分钟 P1）
+      - alert: OjLogStreamInterrupted
+        expr: absent(vector_heartbeat_total[5m])
+        for: 5m
+        labels: { severity: P1 }
+        annotations:
+          summary: "日志管道断流超过 5 分钟"
+          description: "Vector 心跳缺失，可能是采集器或 TLS 通道故障；人工核查采集链路。"
+
+      # 判题队列积压（可领取任务堆积 10 分钟）
+      - alert: OjJudgeQueueBacklog
+        expr: oj_judge_tasks_pending > 20
+        for: 10m
+        labels: { severity: P1 }
+        annotations:
+          summary: "判题队列积压"
+          description: "PENDING 任务超过 20 个持续 10 分钟；检查 Agent 存活与沙箱资源池。"
+
+      # Agent 全部离线（无活跃心跳）
+      - alert: OjJudgeAgentsOffline
+        expr: oj_judge_agents_active == 0
+        for: 5m
+        labels: { severity: P1 }
+        annotations:
+          summary: "无活跃判题 Agent"
+          description: "所有 Agent 超过 5 分钟无心跳，判题停摆。"
+
+      # 测试数据分发异常（错配/越权拉取）→ P1（设计 6.3）
+      - alert: OjTestcaseMismatch
+        expr: increase(oj_testcase_mismatch_total[10m]) > 0
+        labels: { severity: P1 }
+        annotations:
+          summary: "检测到与当前任务不匹配的用例请求"
+          description: "Agent 已被自动熔断暂停；核查该 Agent 是否失陷。"
+
+      # 沙箱降级运行 → P1（设计 6.1.5：MicroVM 失败不得静默降级）
+      - alert: OjSandboxFallbackActive
+        expr: oj_sandbox_mode_info{mode="gvisor"} == 1
+        for: 1m
+        labels: { severity: P1 }
+        annotations:
+          summary: "判题沙箱处于 gVisor 降级模式"
+          description: "KVM/Firecracker 不可用，已显式降级为较弱隔离；考试模式禁止自动继续。"
+
+      # 判题结果分布异常（SE 激增）
+      - alert: OjJudgeSeRateHigh
+        expr: increase(oj_judge_results_total{code="SE"}[15m]) > 5
+        labels: { severity: P1 }
+        annotations:
+          summary: "判题系统错误（SE）激增"
+          description: "15 分钟内 SE 超过 5 次，判题链路存在基础设施故障。"
+
+      # 磁盘容量告警（含备份/导出目录）
+      - alert: OjDiskNearlyFull
+        expr: (node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}) < 0.15
+        for: 15m
+        labels: { severity: P1 }
+        annotations:
+          summary: "磁盘剩余空间不足 15%"
+          description: "核查备份与导出目录占用；备份失败会直接放大数据丢失风险。"
+
+      # 清理任务失败（导出文件过期未删）
+      - alert: OjExportCleanupFailed
+        expr: increase(oj_export_cleanup_failed_total[1h]) > 0
+        labels: { severity: P1 }
+        annotations:
+          summary: "导出文件清理任务失败"
+          description: "过期导出文件可能仍可访问，须人工核查并清理。"
+
+  - name: oj-warning
+    rules:
+      # 入口证书临期（自签名证书 397 天，30 天开始告警）
+      - alert: OjIngressCertExpiring
+        expr: probe_ssl_earliest_cert_expiry - time() < 86400 * 30
+        for: 1h
+        labels: { severity: P2 }
+        annotations:
+          summary: "入口 TLS 证书剩余有效期不足 30 天"
+          description: "内测自签名证书需续期（infra/ingress/gen-selfsigned-cert.sh）。"
+
+      # 失败登录激增
+      - alert: OjFailedLoginSpike
+        expr: increase(oj_login_failed_total[15m]) > 50
+        labels: { severity: P2 }
+        annotations:
+          summary: "失败登录激增"
+          description: "疑似撞库/暴力登录；应用侧已锁定，核查来源 IP。"
+
+      # 备份任务失败/超期未成功
+      - alert: OjBackupStale
+        expr: time() - oj_backup_last_success_timestamp > 90000
+        for: 1h
+        labels: { severity: P2 }
+        annotations:
+          summary: "备份超过 25 小时未成功"
+          description: "同机备份链路异常（注意：同机备份不能防御整机故障）。"
+
+      # Outbox 积压（发布通道故障）
+      - alert: OjOutboxBacklog
+        expr: oj_judge_outbox_pending > 0
+        for: 15m
+        labels: { severity: P2 }
+        annotations:
+          summary: "判题事件 Outbox 积压"
+          description: "OutboxDispatcher 或 RabbitMQ 通道故障，新提交任务未被派发。"

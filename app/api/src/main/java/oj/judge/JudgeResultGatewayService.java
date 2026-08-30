@@ -37,6 +37,7 @@ public class JudgeResultGatewayService {
     public record GatewayResultCommand(String taskUuid, String agentId, String resultCode,
                                        BigDecimal normalizedScore, long totalTimeMs, long peakMemoryKb,
                                        int resultVersion, Integer snapshotVersion,
+                                       String sandboxMode,
                                        java.util.List<GatewayTestcaseOutcome> testcases,
                                        String signature) {
     }
@@ -57,6 +58,8 @@ public class JudgeResultGatewayService {
     private final JudgeGuard guard;
     private final AuditService auditService;
     private final ObjectMapper objectMapper;
+    private final io.micrometer.core.instrument.MeterRegistry meterRegistry;
+    private final JudgeMetrics judgeMetrics;
 
     public JudgeResultGatewayService(JudgeTaskRepository taskRepository,
                                      JudgeResultRepository judgeResultRepository,
@@ -66,7 +69,9 @@ public class JudgeResultGatewayService {
                                      JudgeAgentService agentService,
                                      JudgeGuard guard,
                                      AuditService auditService,
-                                     ObjectMapper objectMapper) {
+                                     ObjectMapper objectMapper,
+                                     io.micrometer.core.instrument.MeterRegistry meterRegistry,
+                                     JudgeMetrics judgeMetrics) {
         this.taskRepository = taskRepository;
         this.judgeResultRepository = judgeResultRepository;
         this.snapshotRepository = snapshotRepository;
@@ -76,6 +81,8 @@ public class JudgeResultGatewayService {
         this.guard = guard;
         this.auditService = auditService;
         this.objectMapper = objectMapper;
+        this.meterRegistry = meterRegistry;
+        this.judgeMetrics = judgeMetrics;
     }
 
     @Transactional
@@ -87,6 +94,11 @@ public class JudgeResultGatewayService {
             guard.auditRejection(AuditActions.JUDGE_RESULT_SIGNATURE_INVALID, "JUDGE_TASK",
                     command.taskUuid(), Map.of("agentId", command.agentId()));
             throw new ApiException(ErrorCode.RESULT_SIGNATURE_INVALID);
+        }
+
+        // 0. 沙箱模式观测（Agent 上报，供 oj_sandbox_mode_info 告警消费）
+        if (command.sandboxMode() != null) {
+            judgeMetrics.observeSandboxMode(command.sandboxMode());
         }
 
         JudgeTask task = taskRepository.findByTaskUuid(command.taskUuid())
@@ -140,6 +152,8 @@ public class JudgeResultGatewayService {
         if ("SE".equals(command.resultCode())) {
             taskService.scheduleRetry(task);
         }
+        // 结果分布指标（SE 激增告警消费）
+        meterRegistry.counter("oj_judge_results_total", "code", command.resultCode()).increment();
         return new GatewayResult(result, false);
     }
 

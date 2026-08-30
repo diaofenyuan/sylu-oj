@@ -21,6 +21,21 @@ server:
     include-stacktrace: never
     include-message: never
 
+# 管理/指标端口与业务端口分离；网络 ACL（Task 2）仅允许 OPS 抓取 9091
+management:
+  server:
+    port: 9091
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+  metrics:
+    tags:
+      application: oj-api
+
 oj:
   auth:
     # 生产环境禁止本地合成账号：教务网页登录适配器（Task 5）为生产唯一登录路径。

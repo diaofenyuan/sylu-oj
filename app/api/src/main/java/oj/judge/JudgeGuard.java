@@ -20,13 +20,16 @@ public class JudgeGuard {
     private final JudgeAgentRepository agentRepository;
     private final TestcaseDistributionRepository distributionRepository;
     private final AuditService auditService;
+    private final JudgeMetrics metrics;
 
     public JudgeGuard(JudgeAgentRepository agentRepository,
                       TestcaseDistributionRepository distributionRepository,
-                      AuditService auditService) {
+                      AuditService auditService,
+                      JudgeMetrics metrics) {
         this.agentRepository = agentRepository;
         this.distributionRepository = distributionRepository;
         this.auditService = auditService;
+        this.metrics = metrics;
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -45,6 +48,7 @@ public class JudgeGuard {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordMismatchedRequest(String agentId, String taskUuid, Long problemId, int order) {
         distributionRepository.save(new TestcaseDistribution(agentId, taskUuid, problemId, order, false));
+        metrics.incrementTestcaseMismatch();
         auditService.record(AuditActions.TESTCASE_MISMATCH_DETECTED, "JUDGE_TASK", taskUuid,
                 null, Map.of("agentId", agentId, "testcaseOrder", order, "problemId", problemId));
     }

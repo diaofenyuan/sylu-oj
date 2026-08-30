@@ -1,0 +1,49 @@
+# Vector 日志管道（Task 8）：各业务 VM 的应用/Nginx/auditd 日志
+# 经 TLS 发送到本机 OPS 区聚合存储（设计 10.1）。
+# 内容红线：不得包含密码、令牌、完整身份证明材料、测试数据与源码。
+# 断流检测由 OPS 端 Prometheus 以 absent(vector_heartbeat) 5 分钟告警（见 alert.rules.yml）。
+
+data_dir = /var/lib/vector
+
+[sources.app_log]
+type = "file"
+include = ["/var/log/oj/api.log", "/var/log/oj/judge-agent.log"]
+read_from = "beginning"
+fingerprint.strategy = "device_and_inode"
+
+[sources.nginx_log]
+type = "file"
+include = ["/var/log/nginx/oj-ingress-access.log", "/var/log/nginx/oj-ingress-error.log"]
+
+[sources.audit_log]
+type = "file"
+include = ["/var/log/audit/audit.log"]
+
+# 脱敏：丢弃任何疑似令牌/密码行（纵深防御，应用侧已保证不打印）
+[transforms.redact]
+type = "remap"
+inputs = ["app_log", "nginx_log", "audit_log"]
+source = '''
+msg = to_string(.message) ?? ""
+if contains(msg, "password") || contains(msg, "token=") || contains(msg, "secret") {
+  .message = "[REDACTED] 疑似敏感内容已由采集端脱敏"
+}
+'''
+
+[sinks.ops_tls]
+type = "socket"
+inputs = ["redact"]
+mode = "tcp"
+address = "${OJ_OPS_ADDRESS:-ops-vm:6514}"
+encoding.codec = "json"
+tls.enabled = true
+tls.verify_certificate = true
+tls.ca_file = "/etc/oj-logging/ops-ca.crt"
+tls.crt_file = "/etc/oj-logging/client.crt"
+tls.key_file = "/etc/oj-logging/client.key"
+
+# 心跳指标：OPS 端 absent(heartbeat) 5 分钟 → P1 日志断流告警
+[sinks.prometheus_exporter]
+type = "prometheus_exporter"
+inputs = ["redact"]
+address = "127.0.0.1:9598"

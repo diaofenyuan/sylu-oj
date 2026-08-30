@@ -63,7 +63,7 @@ public class JudgeGatewayController {
 
     public record ResultRequest(String resultCode, java.math.BigDecimal normalizedScore,
                                 long totalTimeMs, long peakMemoryKb, Integer resultVersion,
-                                Integer snapshotVersion,
+                                Integer snapshotVersion, String sandboxMode,
                                 List<JudgeResultGatewayService.GatewayTestcaseOutcome> testcases,
                                 String signature) {
     }
@@ -145,7 +145,7 @@ public class JudgeGatewayController {
                 taskUuid, agentId, request.resultCode(), request.normalizedScore(),
                 request.totalTimeMs(), request.peakMemoryKb(),
                 request.resultVersion() == null ? 1 : request.resultVersion(),
-                request.snapshotVersion(), request.testcases(), request.signature()));
+                request.snapshotVersion(), request.sandboxMode(), request.testcases(), request.signature()));
         HttpStatus status = outcome.duplicate() ? HttpStatus.OK : HttpStatus.CREATED;
         return ResponseEntity.status(status).body(Map.of(
                 "judgeResultId", outcome.result().getId(),
