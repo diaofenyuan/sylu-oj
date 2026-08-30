@@ -62,10 +62,11 @@
       <!-- 右栏:编辑器 + 结果面板 -->
       <section class="wb-right">
         <div class="code-toolbar">
+          <span class="file-tab" :style="{ '--dot': langDot }">{{ fileName }}</span>
           <select v-model="language" aria-label="选择编程语言">
             <option v-for="item in selected?.languages || langs" :key="item" :value="item">{{ langName(item) }}</option>
           </select>
-          <span class="muted mode-tag">ACM 模式 · stdin/stdout</span>
+          <span class="mode-tag">ACM 模式 · stdin/stdout</span>
           <span class="spacer"></span>
           <button class="tb-btn" @click="resetCode">重置代码</button>
         </div>
@@ -205,14 +206,64 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../../api'
 
-import { EditorView, keymap, lineNumbers, highlightActiveLineGutter } from '@codemirror/view'
+import {
+  EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection
+} from '@codemirror/view'
 import { EditorState, Compartment } from '@codemirror/state'
 import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands'
-import { indentOnInput, bracketMatching } from '@codemirror/language'
-import { oneDark } from '@codemirror/theme-one-dark'
+import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
+import { indentOnInput, bracketMatching, syntaxHighlighting, HighlightStyle } from '@codemirror/language'
+import { tags } from '@lezer/highlight'
 import { cpp } from '@codemirror/lang-cpp'
 import { python } from '@codemirror/lang-python'
 import { java } from '@codemirror/lang-java'
+
+// VS Code Dark+ 风格的主题
+const vscodeTheme = [
+  EditorView.theme({
+    '&': { color: '#d4d4d4', backgroundColor: '#1e1e1e', height: '100%', fontSize: '13.5px' },
+    '.cm-content': { caretColor: '#aeafad', fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace" },
+    '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#aeafad' },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
+      backgroundColor: '#264f7890'
+    },
+    '.cm-activeLine': { backgroundColor: '#2a2d2e' },
+    '.cm-activeLineGutter': { backgroundColor: '#2a2d2e', color: '#c6c6c6' },
+    '.cm-gutters': { backgroundColor: '#1e1e1e', color: '#858585', border: 'none', borderRight: '1px solid #333333' },
+    '.cm-lineNumbers .cm-gutterElement': { padding: '0 9px 0 12px', minWidth: '38px' },
+    '.cm-foldGutter': { color: '#858585' },
+    '.cm-scroller': { lineHeight: '1.55', fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace" },
+    '.cm-matchingBracket': { backgroundColor: '#3a3d4180', outline: '1px solid #85858580' },
+    '.cm-selectionMatch': { backgroundColor: '#264f7880' },
+    '.cm-tooltip': { border: '1px solid #454545', backgroundColor: '#252526', color: '#d4d4d4', fontFamily: "Consolas, monospace" },
+    '.cm-tooltip-autocomplete > ul > li': { color: '#d4d4d4', fontFamily: "'Cascadia Code', Consolas, monospace" },
+    '.cm-tooltip-autocomplete > ul > li[aria-selected]': { backgroundColor: '#04395e', color: '#fff' },
+    '.cm-searchMatch': { backgroundColor: '#61321480', outline: '1px solid #f97918' },
+    '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: '#1e6fa280' },
+    '.cm-panels': { backgroundColor: '#252526', color: '#cccccc', borderTop: '1px solid #333333' },
+    '.cm-panels.cm-panels-top': { borderBottom: '1px solid #333333' }
+  }),
+  syntaxHighlighting(HighlightStyle.define([
+    { tag: tags.comment, color: '#6a9955', fontStyle: 'italic' },
+    { tag: [tags.keyword, tags.modifier, tags.self, tags.special(tags.name), tags.definitionKeyword], color: '#569cd6' },
+    { tag: [tags.controlKeyword, tags.moduleKeyword, tags.operatorKeyword], color: '#c586c0' },
+    { tag: [tags.string, tags.character, tags.special(tags.string)], color: '#ce9178' },
+    { tag: tags.regexp, color: '#d16969' },
+    { tag: [tags.number, tags.bool, tags.null], color: '#b5cea8' },
+    { tag: [tags.tagName, tags.typeName, tags.className, tags.namespace], color: '#4ec9b0' },
+    { tag: [tags.definition(tags.variableName), tags.function(tags.variableName), tags.function(tags.propertyName)], color: '#dcdcaa' },
+    { tag: [tags.variableName, tags.propertyName, tags.attributeName], color: '#9cdcfe' },
+    { tag: [tags.labelName, tags.constant(tags.variableName), tags.definition(tags.constant)], color: '#b5cea8' },
+    { tag: tags.macroName, color: '#c586c0' },
+    { tag: tags.meta, color: '#ce9178' },
+    { tag: [tags.punctuation, tags.operator, tags.derefOperator, tags.separator], color: '#d4d4d4' },
+    { tag: tags.processingInstruction, color: '#c586c0' },
+    { tag: tags.invalid, color: '#f44747' }
+  ]))
+]
+
+const FILE_NAMES = { C: 'main.c', CPP: 'main.cpp', PYTHON: 'main.py', JAVA: 'Main.java' }
+const LANG_DOTS = { C: '#519aba', CPP: '#519aba', PYTHON: '#3572a5', JAVA: '#b07219' }
 
 const levels = [
   { key: 'EASY', label: '入门' },
@@ -270,6 +321,8 @@ const filteredProblems = computed(() => problems.value.filter(problem => {
   return matchesDifficulty && matchesKeyword && matchesStatus
 }))
 const passedCount = computed(() => problems.value.filter(problem => problem.status === 'AC').length)
+const fileName = computed(() => FILE_NAMES[language.value] || 'main.txt')
+const langDot = computed(() => LANG_DOTS[language.value] || '#6a737d')
 const currentIndex = computed(() =>
   problems.value.findIndex(problem => problem.problemId === selectedId.value))
 const hasPrev = computed(() => currentIndex.value > 0)
@@ -338,16 +391,15 @@ function mountEditor() {
       extensions: [
         lineNumbers(),
         highlightActiveLineGutter(),
+        highlightActiveLine(),
         history(),
         indentOnInput(),
         bracketMatching(),
-        keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+        closeBrackets(),
+        keymap.of([...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap, indentWithTab]),
         langCompartment.of(langExtension(language.value)),
-        oneDark,
-        EditorView.theme({
-          '&': { height: '100%', fontSize: '13.5px' },
-          '.cm-scroller': { fontFamily: 'Consolas, Monaco, monospace', lineHeight: '1.6' }
-        }),
+        drawSelection(),
+        ...vscodeTheme,
         EditorView.updateListener.of(update => {
           if (update.docChanged) {
             code.value = update.state.doc.toString()
@@ -630,25 +682,46 @@ onBeforeUnmount(() => {
 }
 .wb-splitter:hover { background: var(--accent); }
 
-.wb-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #1e293b; }
+.wb-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #1e1e1e; }
 .code-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: #0f172a;
-  border-bottom: 1px solid #1e293b;
+  background: #1f1f1f;
+  border-bottom: 1px solid #333333;
 }
-.code-toolbar select { background: #1e293b; color: #e2e8f0; border-color: #334155; padding: 6px 10px; }
-.mode-tag { color: #64748b; font-size: 12px; }
-.code-toolbar .tb-btn { background: #1e293b; color: #cbd5e1; border-color: #334155; }
-.code-toolbar .tb-btn:hover:not(:disabled) { background: #334155; }
+.code-toolbar select { background: #3c3c3c; color: #cccccc; border: 1px solid #454545; padding: 5px 10px; font-size: 13px; }
+.code-toolbar select:hover { border-color: #5a5a5a; }
+.mode-tag { color: #8a8a8a; font-size: 12px; }
+.code-toolbar .tb-btn { background: #3c3c3c; color: #cccccc; border: 1px solid transparent; }
+.code-toolbar .tb-btn:hover:not(:disabled) { background: #4a4a4a; color: #fff; border-color: transparent; }
 .code-toolbar .spacer { flex: 1; }
+.file-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #2d2d2d;
+  color: #e8e8e8;
+  border: 1px solid #3f3f3f;
+  border-radius: 6px;
+  padding: 4px 12px;
+  font-size: 13px;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+.file-tab::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--dot, #519aba);
+  flex: none;
+}
 
 .cm-wrap { flex: 1; min-height: 0; }
 .cm-host { height: 100%; }
 .cm-host :deep(.cm-editor) { height: 100%; }
-.cm-host :deep(.cm-gutters) { border-right: 1px solid #1e293b; }
+.cm-host :deep(.cm-gutters) { border-right: 1px solid #333333; }
 
 .result-panel { flex: none; border-top: 1px solid #334155; background: #fff; display: flex; flex-direction: column; height: 250px; }
 .result-panel.collapsed { height: auto; }
