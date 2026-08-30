@@ -100,4 +100,7 @@ if [ ! -f "$REPO/var/oj-dev-agent.env" ]; then
 fi
 sed -i 's#^OJ_POLICY_FILE=.*#OJ_POLICY_FILE='"$REPO"'/judge/sandbox/language-policy.dev.yaml#' "$REPO/var/oj-dev-agent.env"
 
+# Windows-committed shell scripts lose the exec bit; restore it
+chmod +x "$REPO"/scripts/wsl/*.sh 2>/dev/null || true
+
 log "done. start the stack: bash $REPO/scripts/wsl/start-all.sh"
