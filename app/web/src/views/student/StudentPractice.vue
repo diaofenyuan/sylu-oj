@@ -354,7 +354,17 @@ function levelPassed(key) { return problems.value.filter(problem => problem.diff
 function stateText(status) { return ({ AC: '已通过', PD: '评测中', UNATTEMPTED: '未开始', WA: '答案错误', CE: '编译错误', TLE: '超时', MLE: '内存超限', OLE: '输出超限', PE: '格式错误', RE: '运行错误', SE: '评测服务异常', BSC: '沙盒拦截' })[status] || status }
 function stateClass(status) { return ({ AC: 'chip-ok', PD: 'chip-warn', UNATTEMPTED: 'chip-muted', WA: 'chip-bad', CE: 'chip-bad', TLE: 'chip-bad', MLE: 'chip-bad', OLE: 'chip-bad', PE: 'chip-bad', RE: 'chip-bad', SE: 'chip-bad', BSC: 'chip-bad' })[status] || 'chip-muted' }
 function langName(value) { return ({ C: 'C', CPP: 'C++', PYTHON: 'Python', JAVA: 'Java' })[value] || value }
-function draftKey(id) { return `oj-practice-draft-${id}` }
+function draftKey(id, lang) { return `oj-practice-draft-${id}-${lang || ''}` }
+function loadCodeFor(problemId, lang) {
+  const saved = localStorage.getItem(draftKey(problemId, lang))
+  if (saved) return saved
+  const legacy = localStorage.getItem(`oj-practice-draft-${problemId}`)
+  if (legacy) {
+    localStorage.setItem(draftKey(problemId, lang), legacy)
+    return legacy
+  }
+  return CODE_TEMPLATES[lang] || ''
+}
 function fmtTime(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '' }
 
 async function copyText(text, tip) {
@@ -403,7 +413,7 @@ function mountEditor() {
         EditorView.updateListener.of(update => {
           if (update.docChanged) {
             code.value = update.state.doc.toString()
-            if (selected.value) localStorage.setItem(draftKey(selected.value.problemId), code.value)
+            if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
           }
         })
       ]
@@ -416,8 +426,10 @@ function setEditorDoc(text) {
   editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: text } })
 }
 
-watch(language, value => {
+watch(language, (value, old) => {
   editorView?.dispatch({ effects: langCompartment.reconfigure(langExtension(value)) })
+  if (!old || !editorView || !selected.value) return
+  setEditorDoc(loadCodeFor(selected.value.problemId, value))
 })
 
 async function loadProblems() {
@@ -440,7 +452,7 @@ async function selectProblem(problemId) {
   language.value = selected.value.languages?.[0] || 'CPP'
   const firstSample = selected.value.samples?.[0]
   selfTestInput.value = firstSample?.input || ''
-  code.value = localStorage.getItem(draftKey(problemId)) || CODE_TEMPLATES[language.value] || ''
+  code.value = loadCodeFor(problemId, language.value)
   if (!editorView) {
     await nextTick()
     mountEditor()
@@ -495,7 +507,7 @@ function clearPoll() {
 
 async function submit() {
   if (!selected.value || !code.value.trim()) return
-  localStorage.setItem(draftKey(selected.value.problemId), code.value)
+  localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
   submitting.value = true
   try {
     await api('/student/submissions', {
@@ -545,7 +557,7 @@ function resetCode() {
   const template = CODE_TEMPLATES[language.value] || ''
   code.value = template
   setEditorDoc(template)
-  if (selected.value) localStorage.setItem(draftKey(selected.value.problemId), template)
+  if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), template)
 }
 
 function openPanel(key) {
@@ -593,7 +605,7 @@ function onKeydown(event) {
   }
   if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
     event.preventDefault()
-    if (selected.value) localStorage.setItem(draftKey(selected.value.problemId), code.value)
+    if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
     flashTip('草稿已保存')
   }
 }

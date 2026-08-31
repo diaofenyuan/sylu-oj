@@ -10,6 +10,8 @@ public interface ProblemRepository extends JpaRepository<Problem, Long> {
 
     List<Problem> findByProblemBankIdOrderByIdAsc(Long problemBankId);
 
+    Optional<Problem> findByProblemBankIdAndCode(Long problemBankId, String code);
+
     Optional<Problem> findByIdAndProblemBankId(Long id, Long problemBankId);
 
     boolean existsByProblemBankIdAndCode(Long problemBankId, String code);

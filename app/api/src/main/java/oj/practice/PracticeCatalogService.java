@@ -49,7 +49,7 @@ public class PracticeCatalogService {
 
     public static final String BANK_NAME = "系统刷题题库";
     public static final String ASSIGNMENT_TITLE = "系统刷题中心";
-    private static final String PRACTICE_SCORING_RULES = "{\"catalog\":\"SYLU_OJ_PRACTICE_V1\",\"policy\":\"bestScore\"}";
+    private static final String PRACTICE_SCORING_RULES = "{\"catalog\":\"SYLU_OJ_PRACTICE_V2\",\"policy\":\"bestScore\"}";
     private static final List<String> LEVELS = List.of("EASY", "BASIC", "INTERMEDIATE", "HARD");
     private static final List<String> LANGUAGES = List.of("C", "CPP", "PYTHON", "JAVA");
 
@@ -200,18 +200,28 @@ public class PracticeCatalogService {
 
         List<Problem> problems = new ArrayList<>();
         for (int level = 0; level < LEVELS.size(); level++) {
+            String levelName = LEVELS.get(level);
             for (int index = 1; index <= 25; index++) {
-                Question question = question(LEVELS.get(level), index);
-                Problem problem = new Problem(bank.getId(),
-                        "PRACTICE-" + LEVELS.get(level) + "-" + String.format("%02d", index),
-                        question.title(), question.description(), String.join(",", LANGUAGES),
-                        LEVELS.get(level), 10000, 256, 65536, BigDecimal.valueOf(100), teacher.getTeacherId());
+                PracticeQuestionCatalog.Question question = PracticeQuestionCatalog.question(level, index);
+                String code = "PRACTICE-" + levelName + "-" + String.format("%02d", index);
+                Problem problem = problemRepository.findByProblemBankIdAndCode(bank.getId(), code)
+                        .map(current -> {
+                            current.updateTitle(question.title());
+                            current.updateDescription(question.description());
+                            current.bumpVersion();
+                            return current;
+                        })
+                        .orElseGet(() -> new Problem(bank.getId(), code, question.title(), question.description(),
+                                String.join(",", LANGUAGES), levelName, 10000, 256, 65536,
+                                BigDecimal.valueOf(100), teacher.getTeacherId()));
                 problem.publish();
                 problem = problemRepository.save(problem);
-                TestcaseSet set = testcaseSetRepository.save(new TestcaseSet(problem.getId(), 1));
-                testcaseRepository.saveAll(List.of(
-                        new Testcase(set.getId(), 1, true, question.sampleInput(), question.sampleOutput(), BigDecimal.valueOf(30)),
-                        new Testcase(set.getId(), 2, false, question.hiddenInput(), question.hiddenOutput(), BigDecimal.valueOf(70))));
+                // 每个版本生成新的用例集合：1 个公开样例，做对满分 100 分。
+                int version = testcaseSetRepository.findFirstByProblemIdOrderByVersionDesc(problem.getId())
+                        .map(TestcaseSet::getVersion).orElse(0) + 1;
+                TestcaseSet set = testcaseSetRepository.save(new TestcaseSet(problem.getId(), version));
+                testcaseRepository.save(new Testcase(set.getId(), 1, true,
+                        question.sampleInput(), question.sampleOutput(), BigDecimal.valueOf(100)));
                 problems.add(problem);
             }
         }
@@ -234,11 +244,10 @@ public class PracticeCatalogService {
         return new Catalog(target, snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(assignment.getId()));
     }
 
-    /** 仅认领由本服务生成的固定 100 题目录，避免教师同名作业被误当成系统题库。 */
+    /** 仅认领由本服务生成的最新版（V2）固定 100 题目录；
+     * 旧版占位目录（V1）不匹配，将在下一次访问时被替换重建。 */
     private boolean isPracticeCatalog(Assignment assignment, AssignmentTarget target) {
-        // 兼容首版已生成的目录（旧版评分规则为 bestScore），仍必须通过下面的固定题目结构校验。
-        if (!PRACTICE_SCORING_RULES.equals(target.getScoringRules())
-                && !"bestScore".equals(target.getScoringRules())) {
+        if (!PRACTICE_SCORING_RULES.equals(target.getScoringRules())) {
             return false;
         }
         List<ProblemSnapshot> snapshots = snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(assignment.getId());
@@ -288,26 +297,5 @@ public class PracticeCatalogService {
         } catch (Exception e) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "刷题题目校验摘要生成失败");
         }
-    }
-
-    private record Question(String title, String description, String sampleInput, String sampleOutput,
-                            String hiddenInput, String hiddenOutput) {
-    }
-
-    private Question question(String level, int index) {
-        return switch (level) {
-            case "EASY" -> new Question("两数求和 · 入门 " + String.format("%02d", index),
-                    "读入两个整数 a 和 b，输出它们的和。练习标准输入、变量与算术运算。",
-                    "3 5", "8", (index + 10) + " " + (index * 2), String.valueOf(index * 3 + 10));
-            case "BASIC" -> new Question("数组求和 · 基础 " + String.format("%02d", index),
-                    "第一行输入 n，第二行输入 n 个整数，输出数组所有元素之和。",
-                    "5\n1 2 3 4 5", "15", "5\n" + index + " 2 4 6 8 10", String.valueOf(index + 30));
-            case "INTERMEDIATE" -> new Question("区间和查询 · 进阶 " + String.format("%02d", index),
-                    "给定数组和多个闭区间查询，使用前缀和输出每个区间的元素和，每行一个答案。",
-                    "5 2\n1 2 3 4 5\n1 3\n2 5", "6\n14", "6 2\n" + index + " 2 4 6 8 10\n1 4\n3 6", String.valueOf(index + 12) + "\n28");
-            default -> new Question("最长递增子序列 · 困难 " + String.format("%02d", index),
-                    "给定整数序列，输出最长严格递增子序列的长度。要求处理重复值并控制算法复杂度。",
-                    "8\n10 9 2 5 3 7 101 18", "4", "10\n" + index + " 1 2 3 2 4 5 1 6 7", "7");
-        };
     }
 }

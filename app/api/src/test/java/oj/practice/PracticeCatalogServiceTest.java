@@ -59,6 +59,7 @@ class PracticeCatalogServiceTest extends TestSupport {
         var problems = practiceCatalogService.listProblems(studentId, null);
 
         assertThat(problems).hasSize(100);
+        assertThat(problems).extracting(PracticeCatalogService.PracticeProblem::title).doesNotHaveDuplicates();
         assertThat(problems).extracting(PracticeCatalogService.PracticeProblem::difficulty)
                 .containsExactlyInAnyOrderElementsOf(java.util.stream.Stream.of("EASY", "BASIC", "INTERMEDIATE", "HARD")
                         .flatMap(level -> java.util.stream.Stream.generate(() -> level).limit(25)).toList());
