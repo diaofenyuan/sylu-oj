@@ -8,9 +8,13 @@ import oj.assignment.Assignment;
 import oj.assignment.AssignmentService;
 import oj.assignment.AssignmentTarget;
 import oj.assignment.ProblemSnapshot;
+import oj.practice.LocalCodeRunner;
 import oj.problem.ProblemService;
 import oj.problem.Testcase;
 import oj.shared.AccessGuard;
+import oj.shared.ApiException;
+import oj.shared.ErrorCode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +23,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +38,9 @@ import java.util.Map;
 @RequestMapping("/api/student")
 public class StudentController {
 
+    private static final int MAX_RUN_CODE_BYTES = 262_144;
+    private static final int MAX_RUN_INPUT_BYTES = 65_536;
+
     private final AssignmentService assignmentService;
     private final ProblemService problemService;
     private final SubmissionService submissionService;
@@ -39,7 +48,9 @@ public class StudentController {
     private final oj.classroom.ClassroomService classroomService;
     private final oj.submission.SubmissionCounterRepository counterRepository;
     private final JudgeResultRepository judgeResultRepository;
+    private final LocalCodeRunner localCodeRunner;
     private final AccessGuard accessGuard;
+    private final boolean localRunEnabled;
 
     public StudentController(AssignmentService assignmentService,
                              ProblemService problemService,
@@ -48,7 +59,9 @@ public class StudentController {
                              oj.classroom.ClassroomService classroomService,
                              oj.submission.SubmissionCounterRepository counterRepository,
                              JudgeResultRepository judgeResultRepository,
-                             AccessGuard accessGuard) {
+                             LocalCodeRunner localCodeRunner,
+                             AccessGuard accessGuard,
+                             @Value("${oj.judge.local-run.enabled:false}") boolean localRunEnabled) {
         this.assignmentService = assignmentService;
         this.problemService = problemService;
         this.submissionService = submissionService;
@@ -56,7 +69,9 @@ public class StudentController {
         this.classroomService = classroomService;
         this.counterRepository = counterRepository;
         this.judgeResultRepository = judgeResultRepository;
+        this.localCodeRunner = localCodeRunner;
         this.accessGuard = accessGuard;
+        this.localRunEnabled = localRunEnabled;
     }
 
     public record SubmitRequest(@NotNull Long assignmentTargetId, @NotNull Long problemId,
@@ -111,10 +126,57 @@ public class StudentController {
             item.put("judgeConfig", snapshot.getJudgeConfig());
             List<Map<String, Object>> samples = new ArrayList<>();
             for (Testcase tc : problemService.sampleTestcases(snapshot.getTestcaseSetId())) {
-                samples.add(Map.of("orderNum", tc.getOrderNum(), "input", tc.getInput()));
+                samples.add(Map.of("orderNum", tc.getOrderNum(), "input", tc.getInput(),
+                        "expectedOutput", tc.getExpectedOutput()));
             }
             item.put("samples", samples);
             result.add(item);
+        }
+        return result;
+    }
+
+    public record RunRequest(@NotNull Long problemId, @NotBlank String language,
+                             @NotBlank String code, String input) {
+    }
+
+    /**
+     * 作业题目本地自测运行：不落库、不占提交次数、不计分（与刷题自测一致）。
+     */
+    @PostMapping("/targets/{targetId}/run")
+    public Map<String, Object> run(@PathVariable Long targetId, @Valid @RequestBody RunRequest request) {
+        var user = accessGuard.requireStudent();
+        if (!localRunEnabled) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "自测运行未启用");
+        }
+        AssignmentTarget target = assignmentService.requireAccessibleTargetForStudent(user.studentId(), targetId);
+        ProblemSnapshot snapshot = assignmentService.snapshots(target.getAssignmentId()).stream()
+                .filter(item -> item.getProblemId().equals(request.problemId()))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "作业中不存在该题目"));
+        if (!Arrays.asList(snapshot.getLanguages().split(",")).contains(request.language())) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "该题目不支持此语言");
+        }
+        if (request.code().getBytes(StandardCharsets.UTF_8).length > MAX_RUN_CODE_BYTES) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "代码超过自测长度限制");
+        }
+        String input = request.input() == null ? "" : request.input();
+        if (input.getBytes(StandardCharsets.UTF_8).length > MAX_RUN_INPUT_BYTES) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "自测输入超过长度限制");
+        }
+        LocalCodeRunner.RunOutcome outcome = localCodeRunner.run(request.language(), request.code(), input);
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("output", outcome.output());
+        result.put("stderr", outcome.stderr());
+        result.put("compileError", outcome.compileError());
+        result.put("exitCode", outcome.exitCode());
+        result.put("timeMs", outcome.timeMs());
+        result.put("timedOut", outcome.timedOut());
+        if (outcome.compileError() != null && !outcome.compileError().isBlank()) {
+            result.put("phase", "COMPILE_ERROR");
+        } else if (outcome.timedOut()) {
+            result.put("phase", "TIMEOUT");
+        } else {
+            result.put("phase", "FINISHED");
         }
         return result;
     }

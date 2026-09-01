@@ -36,7 +36,8 @@ const router = useRouter()
 const route = useRoute()
 
 const isLogin = computed(() => route.path === '/login' || route.path === '/')
-const isWorkbench = computed(() => route.path.startsWith('/student/practice'))
+const isWorkbench = computed(() =>
+  route.path.startsWith('/student/practice') || route.path.startsWith('/student/targets/'))
 // 依赖 route.path 使其在路由变化时重新读取本地缓存
 const role = computed(() => {
   void route.path
