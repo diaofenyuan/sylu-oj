@@ -177,7 +177,8 @@ public class StudentController {
         result.put("stderr", outcome.stderr());
         result.put("compileError", outcome.compileError());
         result.put("exitCode", outcome.exitCode());
-        result.put("timeMs", outcome.timeMs());
+        result.put("timeUs", outcome.timeUs());
+        result.put("peakMemoryKb", outcome.peakMemoryKb());
         result.put("timedOut", outcome.timedOut());
         if (outcome.compileError() != null && !outcome.compileError().isBlank()) {
             result.put("phase", "COMPILE_ERROR");
@@ -218,6 +219,7 @@ public class StudentController {
             judgeResultRepository.findBySubmissionId(s.getId()).ifPresent(jr -> {
                 item.put("normalizedScore", jr.getNormalizedScore());
                 item.put("totalTimeMs", jr.getTotalTimeMs());
+                item.put("peakMemoryKb", jr.getPeakMemoryKb());
             });
             result.add(item);
         }

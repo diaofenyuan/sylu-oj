@@ -9,24 +9,30 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * 本地自测执行器（仅开发/内测）：把学生代码编译后以样例或自定义输入试跑。
  * 非沙盒实现，生产环境（oj.judge.local-run.enabled=false）整体禁用；
  * 生产判题一律走 Judge Gateway Agent 隔离沙盒。
+ * <p>ACM 精度：墙钟时间以纳秒计取到微秒；峰值内存来自 GNU time -v 的
+ * wait4 rusage（Maximum resident set size），无 /usr/bin/time 时内存回退为 -1。</p>
  */
 @Service
 public class LocalCodeRunner {
 
     public record RunOutcome(String output, String compileError, String stderr,
-                             int exitCode, long timeMs, boolean timedOut) {
+                             int exitCode, long timeUs, long peakMemoryKb, boolean timedOut) {
     }
 
     private static final int COMPILE_TIMEOUT_MS = 30_000;
     private static final int MAX_OUTPUT_BYTES = 262_144;
+    private static final Path GNU_TIME = Path.of("/usr/bin/time");
 
     @Value("${oj.judge.local-run.run-timeout-ms:8000}")
     private long runTimeoutMs;
@@ -68,7 +74,7 @@ public class LocalCodeRunner {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "编译超时");
         }
         if (compile.exitValue() != 0) {
-            return new RunOutcome("", readCapped(compileErr), "", compile.exitValue(), 0, false);
+            return new RunOutcome("", readCapped(compileErr), "", compile.exitValue(), 0, -1, false);
         }
         return execute(dir, runCmd, input);
     }
@@ -83,8 +89,20 @@ public class LocalCodeRunner {
         Path inFile = dir.resolve("stdin.txt");
         Path outFile = dir.resolve("stdout.txt");
         Path errFile = dir.resolve("stderr.txt");
+        Path metricsFile = dir.resolve("time.txt");
         Files.writeString(inFile, input, StandardCharsets.UTF_8);
-        Process process = new ProcessBuilder(runCmd)
+        // 有 GNU time 时以 -o 收集 wait4 rusage 峰值内存（只取其内存指标）；
+        // 墙钟时间由 Java 纳秒时钟测量（微秒级，比 time 的 10ms 小数点更精确）。
+        List<String> command = new ArrayList<>();
+        if (Files.isExecutable(GNU_TIME)) {
+            command.add(GNU_TIME.toString());
+            command.add("-o");
+            command.add(metricsFile.toString());
+            command.add("-v");
+            command.add("--");
+        }
+        command.addAll(runCmd);
+        Process process = new ProcessBuilder(command)
                 .directory(dir.toFile())
                 .redirectInput(ProcessBuilder.Redirect.from(inFile.toFile()))
                 .redirectOutput(ProcessBuilder.Redirect.to(outFile.toFile()))
@@ -92,12 +110,25 @@ public class LocalCodeRunner {
                 .start();
         long start = System.nanoTime();
         boolean finished = process.waitFor(runTimeoutMs, TimeUnit.MILLISECONDS);
-        long timeMs = (System.nanoTime() - start) / 1_000_000;
+        long timeUs = (System.nanoTime() - start) / 1_000;
         if (!finished) {
             process.destroyForcibly();
-            return new RunOutcome(readCapped(outFile), "", readCapped(errFile), -1, timeMs, true);
+            return new RunOutcome(readCapped(outFile), "", readCapped(errFile), -1, timeUs, -1, true);
         }
-        return new RunOutcome(readCapped(outFile), "", readCapped(errFile), process.exitValue(), timeMs, false);
+        return new RunOutcome(readCapped(outFile), "", readCapped(errFile),
+                process.exitValue(), timeUs, peakRssFrom(metricsFile), false);
+    }
+
+    /** 解析 GNU time -v 输出中的峰值驻留内存（KB）；不存在或格式意外时返回 -1。 */
+    private static long peakRssFrom(Path metricsFile) {
+        try {
+            String text = Files.readString(metricsFile, StandardCharsets.UTF_8);
+            Matcher m = Pattern.compile("Maximum resident set size \\(kbytes\\):\\s+(\\d+)\\b")
+                    .matcher(text);
+            return m.find() ? Long.parseLong(m.group(1)) : -1;
+        } catch (IOException | NumberFormatException e) {
+            return -1;
+        }
     }
 
     private String readCapped(Path file) {

@@ -136,7 +136,7 @@
                     运行输出
                     <span v-if="selfTestResult">
                       <span class="chip" :class="selfTestPassed ? 'chip-ok' : 'chip-bad'">{{ selfTestPassed ? '通过' : '与期望输出不一致' }}</span>
-                      <span class="muted">{{ selfTestResult.timeMs }}ms</span>
+                      <span class="muted">{{ fmtUs(selfTestResult.timeUs) }}<template v-if="selfTestResult.peakMemoryKb != null && selfTestResult.peakMemoryKb >= 0"> · {{ fmtMem(selfTestResult.peakMemoryKb) }}</template></span>
                     </span>
                   </div>
                   <pre v-if="selfTestResult" class="st-area mono st-out" :class="{ bad: selfTestFailedPhase }">{{ selfTestOutput }}</pre>
@@ -151,7 +151,7 @@
             <!-- 提交记录 -->
             <template v-else>
               <table v-if="submissions.length" class="sub-table">
-                <thead><tr><th>#</th><th>状态</th><th>得分</th><th>语言</th><th>耗时</th><th>提交时间</th></tr></thead>
+                <thead><tr><th>#</th><th>状态</th><th>得分</th><th>语言</th><th>耗时</th><th>内存</th><th>提交时间</th></tr></thead>
                 <tbody>
                   <tr v-for="s in submissions" :key="s.submissionId">
                     <td>{{ s.attemptNo }}</td>
@@ -159,6 +159,7 @@
                     <td>{{ s.normalizedScore ?? '—' }}</td>
                     <td>{{ langName(s.language) }}</td>
                     <td>{{ s.totalTimeMs != null ? s.totalTimeMs + 'ms' : '—' }}</td>
+                    <td>{{ s.peakMemoryKb != null && s.peakMemoryKb > 0 ? fmtMem(s.peakMemoryKb) : '—' }}</td>
                     <td class="muted">{{ fmtTime(s.submittedAt) }}</td>
                   </tr>
                 </tbody>
@@ -617,10 +618,24 @@ async function runSelfTest() {
       }
     })
   } catch (e) {
-    selfTestResult.value = { phase: 'FINISHED', output: '', stderr: e.message, exitCode: -1, timeMs: 0, timedOut: false }
+    selfTestResult.value = { phase: 'FINISHED', output: '', stderr: e.message, exitCode: -1, timeUs: 0, peakMemoryKb: -1, timedOut: false }
   } finally {
     running.value = false
   }
+}
+
+function fmtUs(us) {
+  if (us == null) return ''
+  if (us < 1000) return (us / 1000).toFixed(2) + 'ms'
+  if (us < 1_000_000) return (us / 1000).toFixed(1) + 'ms'
+  return (us / 1_000_000).toFixed(2) + 's'
+}
+
+function fmtMem(kb) {
+  if (kb == null || kb < 0) return ''
+  if (kb < 1024) return kb + 'KB'
+  if (kb < 1024 * 1024) return (kb / 1024).toFixed(1) + 'MB'
+  return (kb / 1024 / 1024).toFixed(2) + 'GB'
 }
 
 function resetCode() {

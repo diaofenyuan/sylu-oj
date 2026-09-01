@@ -85,7 +85,8 @@ public class PracticeController {
         result.put("stderr", outcome.stderr());
         result.put("compileError", outcome.compileError());
         result.put("exitCode", outcome.exitCode());
-        result.put("timeMs", outcome.timeMs());
+        result.put("timeUs", outcome.timeUs());
+        result.put("peakMemoryKb", outcome.peakMemoryKb());
         result.put("timedOut", outcome.timedOut());
         if (outcome.compileError() != null && !outcome.compileError().isBlank()) {
             result.put("phase", "COMPILE_ERROR");
