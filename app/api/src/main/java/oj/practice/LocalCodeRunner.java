@@ -12,6 +12,8 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -38,6 +40,22 @@ public class LocalCodeRunner {
     private long runTimeoutMs;
 
     public RunOutcome run(String language, String code, String input) {
+        RunOutcome outcome = runRaw(language, code, input);
+        // GNU time 的 Maximum resident set size 含运行时底座（glibc/JVM/解释器），
+        // 扣除各语言的空程序基线，得到近似纯逻辑内存。
+        if (outcome.peakMemoryKb() < 0) {
+            return outcome;
+        }
+        long baseline = baselineKb(language);
+        if (baseline > 0) {
+            long memoryKb = Math.max(0, outcome.peakMemoryKb() - baseline);
+            return new RunOutcome(outcome.output(), outcome.compileError(), outcome.stderr(),
+                    outcome.exitCode(), outcome.timeUs(), memoryKb, outcome.timedOut());
+        }
+        return outcome;
+    }
+
+    private RunOutcome runRaw(String language, String code, String input) {
         Path dir = null;
         try {
             dir = Files.createTempDirectory("oj-local-run-");
@@ -102,13 +120,13 @@ public class LocalCodeRunner {
             command.add("--");
         }
         command.addAll(runCmd);
+        long start = System.nanoTime();
         Process process = new ProcessBuilder(command)
                 .directory(dir.toFile())
                 .redirectInput(ProcessBuilder.Redirect.from(inFile.toFile()))
                 .redirectOutput(ProcessBuilder.Redirect.to(outFile.toFile()))
                 .redirectError(ProcessBuilder.Redirect.to(errFile.toFile()))
                 .start();
-        long start = System.nanoTime();
         boolean finished = process.waitFor(runTimeoutMs, TimeUnit.MILLISECONDS);
         long timeUs = (System.nanoTime() - start) / 1_000;
         if (!finished) {
@@ -129,6 +147,26 @@ public class LocalCodeRunner {
         } catch (IOException | NumberFormatException e) {
             return -1;
         }
+    }
+
+    /** 各语言空程序的峰值 RSS 基线（glibc/JVM/解释器运行时底座），首次测量后缓存。 */
+    private final Map<String, Long> baselinesKb = new ConcurrentHashMap<>();
+
+    private long baselineKb(String language) {
+        return baselinesKb.computeIfAbsent(language, key -> {
+            String emptyCode = switch (key) {
+                case "C" -> "int main(void) { return 0; }";
+                case "CPP" -> "int main() { return 0; }";
+                case "PYTHON" -> "";
+                case "JAVA" -> "public class Main { public static void main(String[] args) {} }";
+                default -> null;
+            };
+            if (emptyCode == null) {
+                return -1L;
+            }
+            RunOutcome r = runRaw(key, emptyCode, "");
+            return r.peakMemoryKb() > 0 ? r.peakMemoryKb() : -1;
+        });
     }
 
     private String readCapped(Path file) {
