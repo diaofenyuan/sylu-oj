@@ -4,14 +4,18 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import oj.auth.AppUser;
+import oj.auth.AppUserRepository;
 import oj.auth.LocalAccountService;
 import oj.audit.AuditEvent;
 import oj.audit.AuditEventRepository;
+import oj.audit.AuditService;
 import oj.shared.AccessGuard;
 import oj.shared.ApiException;
+import oj.shared.AuditActions;
 import oj.shared.ErrorCode;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -38,15 +42,21 @@ public class AdminController {
     private final LocalAccountService localAccountService;
     private final AuditEventRepository auditEventRepository;
     private final AccessGuard accessGuard;
+    private final AppUserRepository appUserRepository;
+    private final AuditService auditService;
 
     public AdminController(ClassroomService classroomService,
                            LocalAccountService localAccountService,
                            AuditEventRepository auditEventRepository,
-                           AccessGuard accessGuard) {
+                           AccessGuard accessGuard,
+                           AppUserRepository appUserRepository,
+                           AuditService auditService) {
         this.classroomService = classroomService;
         this.localAccountService = localAccountService;
         this.auditEventRepository = auditEventRepository;
         this.accessGuard = accessGuard;
+        this.appUserRepository = appUserRepository;
+        this.auditService = auditService;
     }
 
     // ---------------- 请求体 ----------------
@@ -203,12 +213,38 @@ public class AdminController {
 
     // ---------------- 本地合成账号（仅开发/内测） ----------------
 
+    /** 账号列表展示（不含密码哈希），供管理员维护多个账号。 */
+    public record AccountView(Long id, String loginName, AppUser.Role role,
+                              Long teacherId, Long studentId, AppUser.Status status, String createdAt) {
+    }
+
+    @GetMapping("/accounts")
+    public List<AccountView> accounts() {
+        accessGuard.requireAdmin();
+        return appUserRepository.findAll(Sort.by(Sort.Direction.ASC, "id"))
+                .map(u -> new AccountView(u.getId(), u.getLoginName(), u.getRole(),
+                        u.getTeacherId(), u.getStudentId(), u.getStatus(),
+                        u.getCreatedAt() == null ? null : u.getCreatedAt().toString()))
+                .toList();
+    }
+
     @PostMapping("/dev-accounts")
     public Map<String, Object> createDevAccount(@Valid @RequestBody DevAccountRequest request) {
         accessGuard.requireAdmin();
         AppUser user = localAccountService.createLocalAccount(request.role(), request.loginName(),
                 request.password(), request.teacherId(), request.studentId());
         return Map.of("id", user.getId(), "loginName", user.getLoginName(), "role", user.getRole().name());
+    }
+
+    @PostMapping("/accounts/{id}/disable")
+    public Map<String, Object> disableAccount(@PathVariable Long id) {
+        accessGuard.requireAdmin();
+        AppUser user = appUserRepository.findById(id)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND));
+        user.disable();
+        appUserRepository.save(user);
+        auditService.record(AuditActions.ACCOUNT_DISABLED, "APP_USER", String.valueOf(id), null, null);
+        return Map.of("ok", true);
     }
 
     // ---------------- 审计查询 ----------------

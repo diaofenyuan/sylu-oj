@@ -260,9 +260,42 @@
                   <td><button v-if="!e.endedAt" class="danger slim-btn" @click="endEnrollment(e.id)">移出</button></td>
                 </tr>
               </tbody>
-            </table>
-          </div>
-        </template>
+        </table>
+      </div>
+    </template>
+
+    <!-- 账号管理（本地合成账号，可多管理员） -->
+    <template v-if="tab === 'accounts'">
+      <div class="card section">
+        <div class="row section-head">
+          <h3>本地账号</h3>
+          <p class="muted" style="margin: 0;">支持多个管理员；角色任意切换，停用后立即禁止登录</p>
+        </div>
+        <div class="row" style="margin-bottom: 12px;">
+          <select v-model="acctForm.role" class="slim">
+            <option value="ADMIN">管理员</option>
+            <option value="TEACHER">教师</option>
+            <option value="STUDENT">学生</option>
+          </select>
+          <input v-model="acctForm.loginName" placeholder="登录名" class="slim" />
+          <input v-model="acctForm.password" placeholder="初始密码（至少 8 位）" type="password" class="slim" />
+          <button @click="createAccount">创建账号</button>
+        </div>
+        <table>
+          <thead><tr><th>登录名</th><th>角色</th><th>关联</th><th>状态</th><th>创建时间</th><th></th></tr></thead>
+          <tbody>
+            <tr v-for="a in accounts" :key="a.id">
+              <td>{{ a.loginName }}</td>
+              <td><span class="chip" :class="a.role === 'ADMIN' ? 'chip-primary' : 'chip-muted'">{{ a.role }}</span></td>
+              <td>{{ a.role === 'TEACHER' ? 'teacher#' + a.teacherId : a.role === 'STUDENT' ? 'student#' + a.studentId : '—' }}</td>
+              <td><span class="chip" :class="a.status === 'ACTIVE' ? 'chip-ok' : 'chip-muted'">{{ a.status }}</span></td>
+              <td>{{ fmtTime(a.createdAt) }}</td>
+              <td><button v-if="a.status === 'ACTIVE'" class="danger slim-btn" @click="disableAccount(a.id)">停用</button></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </template>
         <div v-else class="empty">请先选择教学班</div>
       </div>
     </template>
@@ -305,6 +338,7 @@ const tabs = [
   { key: 'org', label: '教学组织' },
   { key: 'people', label: '教师与学生' },
   { key: 'assign', label: '授课与选课' },
+  { key: 'accounts', label: '账号管理' },
   { key: 'audit', label: '审计事件' }
 ]
 const tab = ref('org')
@@ -317,6 +351,7 @@ const teachers = ref([])
 const students = ref([])
 const teacherAssignments = ref([])
 const enrollments = ref([])
+const accounts = ref([])
 const audits = ref([])
 const message = ref('')
 const msgOk = ref(true)
@@ -327,6 +362,7 @@ const courseForm = ref({ code: '', name: '', credit: '' })
 const classForm = ref({ termId: '', courseId: '', majorId: '', code: '', name: '' })
 const teacherForm = ref({ staffNo: '', name: '' })
 const studentForm = ref({ studentNo: '', name: '' })
+const acctForm = ref({ role: 'ADMIN', loginName: '', password: '' })
 const studentKeyword = ref('')
 const selectedClassId = ref('')
 const assignTeacherId = ref('')
@@ -357,7 +393,7 @@ const wizardStudentCount = computed(() =>
 )
 
 onMounted(async () => {
-  await Promise.all([loadTerms(), loadMajors(), loadCourses(), loadClasses(), loadTeachers(), loadStudents(), loadAudit()])
+  await Promise.all([loadTerms(), loadMajors(), loadCourses(), loadClasses(), loadTeachers(), loadStudents(), loadAccounts(), loadAudit()])
 })
 
 function notify(text, ok = true) {
@@ -381,6 +417,7 @@ async function loadCourses() { courses.value = await api('/admin/courses') }
 async function loadClasses() { classes.value = await api('/admin/teaching-classes') }
 async function loadTeachers() { teachers.value = await api('/admin/teachers') }
 async function loadStudents() { students.value = await api('/admin/students' + (studentKeyword.value ? `?keyword=${encodeURIComponent(studentKeyword.value)}` : '')) }
+async function loadAccounts() { accounts.value = await api('/admin/accounts') }
 async function loadAudit() { audits.value = await api(`/admin/audit-events?limit=${auditLimit.value || 50}`) }
 
 async function loadAssignments() {
@@ -432,6 +469,15 @@ const createStudent = () => run(async () => {
   await api('/admin/students', { method: 'POST', body: studentForm.value })
   studentForm.value = { studentNo: '', name: '' }
   await loadStudents()
+})
+const createAccount = () => run(async () => {
+  await api('/admin/dev-accounts', { method: 'POST', body: acctForm.value })
+  acctForm.value = { role: 'ADMIN', loginName: '', password: '' }
+  await loadAccounts()
+})
+const disableAccount = (id) => run(async () => {
+  await api(`/admin/accounts/${id}/disable`, { method: 'POST' })
+  await loadAccounts()
 })
 
 const assignTeacher = () => run(async () => {
