@@ -66,16 +66,34 @@ public class LocalAccountService {
         if (!localAccountsEnabled || bootstrapAdminLogin == null || bootstrapAdminLogin.isBlank()) {
             return;
         }
-        if (appUserRepository.existsByLoginName(bootstrapAdminLogin)) {
+        AppUser existing = appUserRepository.findByLoginName(bootstrapAdminLogin).orElse(null);
+        String password = bootstrapAdminPassword;
+        if (existing == null) {
+            if (password == null || password.isBlank()) {
+                password = randomToken();
+                log.warn("开发环境引导管理员 [{}] 初始密码（仅打印一次，请自行保管）：{}", bootstrapAdminLogin, password);
+            }
+            appUserRepository.save(new AppUser(bootstrapAdminLogin, PASSWORD_ENCODER.encode(password),
+                    AppUser.Role.ADMIN, null, null));
+            log.info("引导管理员 [{}] 已创建", bootstrapAdminLogin);
             return;
         }
-        String password = bootstrapAdminPassword;
-        if (password == null || password.isBlank()) {
-            password = randomToken();
-            log.warn("开发环境引导管理员 [{}] 初始密码（仅打印一次，请自行保管）：{}", bootstrapAdminLogin, password);
+        // 主管理员自愈：保证永久存在于管理员列表中（被停用则恢复；重部署/重建库后自动回填）
+        boolean changed = false;
+        if (existing.getStatus() == AppUser.Status.DISABLED) {
+            existing.enable();
+            changed = true;
+            log.info("引导管理员 [{}] 曾被停用，启动时自动恢复为启用", bootstrapAdminLogin);
         }
-        appUserRepository.save(new AppUser(bootstrapAdminLogin, PASSWORD_ENCODER.encode(password),
-                AppUser.Role.ADMIN, null, null));
+        if (password != null && !password.isBlank()
+                && !PASSWORD_ENCODER.matches(password, existing.getPasswordHash())) {
+            existing.setPasswordHash(PASSWORD_ENCODER.encode(password));
+            changed = true;
+            log.info("引导管理员 [{}] 密码已按本地注入配置同步", bootstrapAdminLogin);
+        }
+        if (changed) {
+            appUserRepository.save(existing);
+        }
     }
 
     @Transactional

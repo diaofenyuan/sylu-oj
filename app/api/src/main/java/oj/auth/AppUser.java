@@ -106,6 +106,10 @@ public class AppUser {
         this.status = Status.DISABLED;
     }
 
+    public void enable() {
+        this.status = Status.ACTIVE;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
