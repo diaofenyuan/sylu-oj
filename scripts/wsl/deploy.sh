@@ -106,4 +106,10 @@ grep -q '^OJ_SANDBOX_PREFERRED=' "$env" || echo "OJ_SANDBOX_PREFERRED=host-dev" 
 # Windows-committed shell scripts lose the exec bit; restore it
 chmod +x "$REPO"/scripts/wsl/*.sh 2>/dev/null || true
 
+# ---------- 7. 首次部署：引导设置管理员账号密码 ----------
+# 凭据写入 var/oj-dev-admin.env（不入 git）；已有凭据则跳过。
+if [ ! -s "$REPO/var/oj-dev-admin.env" ]; then
+  "$REPO/scripts/wsl/setup-admin.sh"
+fi
+
 log "done. start the stack: bash $REPO/scripts/wsl/start-all.sh"
