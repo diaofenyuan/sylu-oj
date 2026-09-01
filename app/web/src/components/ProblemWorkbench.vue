@@ -116,7 +116,7 @@
                 <div class="result-line">
                   <span class="chip" :class="stateClass(latestResult.status)">{{ stateText(latestResult.status) }}</span>
                   <span v-if="latestResult.score !== null" class="result-score">得分 <strong>{{ latestResult.score }}</strong>/100</span>
-                  <span v-if="latestResult.timeMs !== null" class="muted">耗时 {{ latestResult.timeMs }}ms</span>
+                  <span v-if="latestResult.timeMs !== null" class="muted">运行时间:{{ latestResult.timeMs }}ms</span>
                 </div>
                 <p v-if="latestResult.score !== null && latestResult.score < 100" class="muted result-hint">
                   未全部通过:可通过左侧样例对照输出,或用「自测运行」调试代码
@@ -136,7 +136,8 @@
                     运行输出
                     <span v-if="selfTestResult">
                       <span class="chip" :class="selfTestPassed ? 'chip-ok' : 'chip-bad'">{{ selfTestPassed ? '通过' : '与期望输出不一致' }}</span>
-                      <span class="muted">{{ fmtUs(selfTestResult.timeUs) }}<template v-if="selfTestResult.peakMemoryKb != null && selfTestResult.peakMemoryKb >= 0"> · {{ fmtMem(selfTestResult.peakMemoryKb) }}</template></span>
+                      <span class="muted" v-if="selfTestResult.timeUs != null">运行时间:{{ fmtUs(selfTestResult.timeUs) }}</span>
+                      <span class="muted" v-if="selfTestResult.peakMemoryKb != null && selfTestResult.peakMemoryKb >= 0">运行内存:{{ fmtMem(selfTestResult.peakMemoryKb) }}</span>
                     </span>
                   </div>
                   <pre v-if="selfTestResult" class="st-area mono st-out" :class="{ bad: selfTestFailedPhase }">{{ selfTestOutput }}</pre>
