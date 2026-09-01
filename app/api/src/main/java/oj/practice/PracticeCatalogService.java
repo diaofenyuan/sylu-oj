@@ -169,6 +169,7 @@ public class PracticeCatalogService {
     }
 
     /** 自测运行所需的题目判题配置（与提交判题使用同一快照 judge_config）。 */
+    @Transactional
     public String judgeConfigFor(Long studentId, Long problemId) {
         Catalog catalog = ensureCatalog(studentId);
         return catalog.snapshots().stream()
