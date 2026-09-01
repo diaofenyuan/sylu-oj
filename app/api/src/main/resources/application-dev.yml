@@ -24,8 +24,10 @@ oj:
   auth:
     local-accounts-enabled: true
     bootstrap-admin:
-      login: devadmin
-      # 为空时启动阶段生成随机密码并写入日志一次，不落盘到仓库。
+      # 内置管理员（仅 dev 环境有效）：OjApiApplication 启动时自动创建。
+      # 密码不落仓库：通过环境变量 OJ_DEV_ADMIN_PASSWORD 注入；
+      # 留空时启动阶段生成随机密码并写入日志一次（仅打印一次，请自行保管）。
+      login: diaofenyuan
       password: ${OJ_DEV_ADMIN_PASSWORD:}
   identity:
     education:

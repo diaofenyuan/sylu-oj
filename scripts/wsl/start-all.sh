@@ -21,8 +21,14 @@ start_bg() { # name, pidfile, command...
 # backend (cwd matters: application-dev.yml uses relative ./var/oj-dev paths;
 # must run inside the WSL-native repo, never on /mnt/d via 9p)
 cd "$REPO/app/api"
+# bootstrap-admin 密码从本地凭据文件注入（var/ 不入 git），未创建时启动生成随机密码
+ADMIN_ENV=()
+if [ -f "$REPO/var/oj-dev-admin.env" ]; then
+  set -a; . "$REPO/var/oj-dev-admin.env"; set +a
+  ADMIN_ENV=(OJ_DEV_ADMIN_PASSWORD="${OJ_DEV_ADMIN_PASSWORD:-}")
+fi
 start_bg backend "$LOG/backend.pid" env \
-  JAVA_HOME="$OPT/jdk17" PATH="$OPT/jdk17/bin:$PATH" \
+  JAVA_HOME="$OPT/jdk17" PATH="$OPT/jdk17/bin:$PATH" "${ADMIN_ENV[@]}" \
   "$OPT/jdk17/bin/java" -jar \
   "$REPO/app/api/target/oj-api-0.4.0.jar" --spring.profiles.active=dev
 
