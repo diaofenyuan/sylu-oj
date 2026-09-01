@@ -221,7 +221,7 @@ public class AdminController {
     @GetMapping("/accounts")
     public List<AccountView> accounts() {
         accessGuard.requireAdmin();
-        return appUserRepository.findAll(Sort.by(Sort.Direction.ASC, "id"))
+        return appUserRepository.findAll(Sort.by(Sort.Direction.ASC, "id")).stream()
                 .map(u -> new AccountView(u.getId(), u.getLoginName(), u.getRole(),
                         u.getTeacherId(), u.getStudentId(), u.getStatus(),
                         u.getCreatedAt() == null ? null : u.getCreatedAt().toString()))

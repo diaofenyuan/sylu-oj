@@ -80,6 +80,7 @@ public final class AuditActions {
     public static final String LOGIN_FAILED = "LOGIN_FAILED";
     public static final String LOGOUT = "LOGOUT";
     public static final String LOCAL_ACCOUNT_CREATED = "LOCAL_ACCOUNT_CREATED";
+    public static final String ACCOUNT_DISABLED = "ACCOUNT_DISABLED";
 
     // 教务网页登录适配器与会话（Task 5）
     public static final String IDENTITY_LOGIN_START = "IDENTITY_LOGIN_START";
