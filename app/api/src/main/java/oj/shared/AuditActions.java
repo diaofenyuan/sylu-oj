@@ -30,6 +30,7 @@ public final class AuditActions {
     public static final String ASSIGNMENT_UPDATED = "ASSIGNMENT_UPDATED";
     public static final String ASSIGNMENT_PUBLISHED = "ASSIGNMENT_PUBLISHED";
     public static final String ASSIGNMENT_TARGET_WITHDRAWN = "ASSIGNMENT_TARGET_WITHDRAWN";
+    public static final String ASSIGNMENT_TARGET_COLLECTED = "ASSIGNMENT_TARGET_COLLECTED";
     public static final String TARGET_RULES_UPDATED = "TARGET_RULES_UPDATED";
 
     // 考试模式（Task 9）

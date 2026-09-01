@@ -24,6 +24,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -51,6 +53,7 @@ public class StudentController {
     private final LocalCodeRunner localCodeRunner;
     private final AccessGuard accessGuard;
     private final boolean localRunEnabled;
+    private final Clock clock;
 
     public StudentController(AssignmentService assignmentService,
                              ProblemService problemService,
@@ -61,7 +64,8 @@ public class StudentController {
                              JudgeResultRepository judgeResultRepository,
                              LocalCodeRunner localCodeRunner,
                              AccessGuard accessGuard,
-                             @Value("${oj.judge.local-run.enabled:false}") boolean localRunEnabled) {
+                             @Value("${oj.judge.local-run.enabled:false}") boolean localRunEnabled,
+                             Clock clock) {
         this.assignmentService = assignmentService;
         this.problemService = problemService;
         this.submissionService = submissionService;
@@ -72,6 +76,7 @@ public class StudentController {
         this.localCodeRunner = localCodeRunner;
         this.accessGuard = accessGuard;
         this.localRunEnabled = localRunEnabled;
+        this.clock = clock;
     }
 
     public record SubmitRequest(@NotNull Long assignmentTargetId, @NotNull Long problemId,
@@ -98,9 +103,10 @@ public class StudentController {
             item.put("assignmentId", assignment.getId());
             item.put("title", assignment.getTitle());
             item.put("mode", assignment.getMode().name());
-            item.put("publishAt", target.getPublishAt().toString());
-            item.put("deadline", target.getDeadline().toString());
+            item.put("publishAt", target.getPublishAt() == null ? null : target.getPublishAt().toString());
+            item.put("deadline", target.getDeadline() == null ? null : target.getDeadline().toString());
             item.put("maxSubmissions", target.getMaxSubmissions());
+            item.put("window", target.windowState(LocalDateTime.now(clock)).name());
             item.put("attemptCount", counterRepository
                     .findById(new oj.submission.SubmissionCounter.Pk(target.getId(), enrollment.getStudentId()))
                     .map(oj.submission.SubmissionCounter::getAttemptCount).orElse(0));
@@ -116,6 +122,7 @@ public class StudentController {
     public List<Map<String, Object>> targetProblems(@PathVariable Long targetId) {
         var user = accessGuard.requireStudent();
         AssignmentTarget target = assignmentService.requireAccessibleTargetForStudent(user.studentId(), targetId);
+        requireStarted(target);
         List<Map<String, Object>> result = new ArrayList<>();
         for (ProblemSnapshot snapshot : assignmentService.snapshots(target.getAssignmentId())) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -149,6 +156,7 @@ public class StudentController {
             throw new ApiException(ErrorCode.FORBIDDEN, "自测运行未启用");
         }
         AssignmentTarget target = assignmentService.requireAccessibleTargetForStudent(user.studentId(), targetId);
+        requireStarted(target);
         ProblemSnapshot snapshot = assignmentService.snapshots(target.getAssignmentId()).stream()
                 .filter(item -> item.getProblemId().equals(request.problemId()))
                 .findFirst()
@@ -192,6 +200,13 @@ public class StudentController {
     }
 
     @GetMapping("/submissions")
+    /** 未到发布时间（定时发布）一律拒绝进入/浏览；已截止仍允许查看题目与成绩复核。 */
+    private void requireStarted(AssignmentTarget target) {
+        if (target.windowState(LocalDateTime.now(clock)) == AssignmentTarget.WindowState.NOT_STARTED) {
+            throw new ApiException(ErrorCode.ASSIGNMENT_NOT_STARTED);
+        }
+    }
+
     public List<Map<String, Object>> mySubmissions(@RequestParam Long assignmentTargetId,
                                                    @RequestParam(required = false) Long problemId) {
         var user = accessGuard.requireStudent();

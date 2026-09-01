@@ -64,6 +64,7 @@ public enum ErrorCode {
     EXAM_SELF_APPROVAL(HttpStatus.CONFLICT, "EXAM_SELF_APPROVAL", "请求人与批准人不得为同一人"),
     EXAM_NOT_LOCKED(HttpStatus.CONFLICT, "EXAM_NOT_LOCKED", "考试尚未锁定"),
     TARGET_RULE_INVALID(HttpStatus.BAD_REQUEST, "TARGET_RULE_INVALID", "目标班级规则不合法"),
+    ASSIGNMENT_NOT_STARTED(HttpStatus.FORBIDDEN, "ASSIGNMENT_NOT_STARTED", "作业尚未开始"),
 
     // 提交
     WINDOW_CLOSED(HttpStatus.FORBIDDEN, "WINDOW_CLOSED", "不在提交时间窗口内"),

@@ -27,6 +27,9 @@ public class AssignmentTarget {
 
     public enum Status {PUBLISHED, WITHDRAWN}
 
+    /** 时间窗口状态：NOT_STARTED 未到发布时间 / OPEN 进行中 / CLOSED 已截止或已撤回。 */
+    public enum WindowState {NOT_STARTED, OPEN, CLOSED}
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -41,10 +44,12 @@ public class AssignmentTarget {
     @Column(name = "status", nullable = false, length = 16)
     private Status status = Status.PUBLISHED;
 
-    @Column(name = "publish_at", nullable = false)
+    /** 发布时间；未设置（NULL）视为立即开放。 */
+    @Column(name = "publish_at")
     private LocalDateTime publishAt;
 
-    @Column(name = "deadline", nullable = false)
+    /** 截止时间；未设置（NULL）视为不限时。 */
+    @Column(name = "deadline")
     private LocalDateTime deadline;
 
     @Column(name = "max_submissions", nullable = false)
@@ -135,9 +140,18 @@ public class AssignmentTarget {
     }
 
     public boolean isOpenAt(LocalDateTime now) {
-        return status == Status.PUBLISHED
-                && (publishAt == null || !now.isBefore(publishAt))
-                && (deadline == null || now.isBefore(deadline));
+        return windowState(now) == WindowState.OPEN;
+    }
+
+    public WindowState windowState(LocalDateTime now) {
+        if (status != Status.PUBLISHED
+                || (deadline != null && !now.isBefore(deadline))) {
+            return WindowState.CLOSED;
+        }
+        if (publishAt != null && now.isBefore(publishAt)) {
+            return WindowState.NOT_STARTED;
+        }
+        return WindowState.OPEN;
     }
 
     public void updateRules(LocalDateTime publishAt, LocalDateTime deadline,

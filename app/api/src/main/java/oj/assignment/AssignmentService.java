@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,6 +46,7 @@ public class AssignmentService {
     private final AccessGuard accessGuard;
     private final ObjectMapper objectMapper;
     private final oj.exam.ExamService examService;
+    private final Clock clock;
 
     public AssignmentService(AssignmentRepository assignmentRepository,
                              AssignmentProblemRepository assignmentProblemRepository,
@@ -55,7 +57,8 @@ public class AssignmentService {
                              AuditService auditService,
                              AccessGuard accessGuard,
                              ObjectMapper objectMapper,
-                             oj.exam.ExamService examService) {
+                             oj.exam.ExamService examService,
+                             Clock clock) {
         this.assignmentRepository = assignmentRepository;
         this.assignmentProblemRepository = assignmentProblemRepository;
         this.targetRepository = targetRepository;
@@ -66,6 +69,7 @@ public class AssignmentService {
         this.accessGuard = accessGuard;
         this.objectMapper = objectMapper;
         this.examService = examService;
+        this.clock = clock;
     }
 
     public record CompositionItem(Long problemId, BigDecimal weight) {
@@ -220,8 +224,8 @@ public class AssignmentService {
                     String.valueOf(target.getId()),
                     null,
                     Map.of("assignmentId", assignmentId, "teachingClassId", classId,
-                            "publishAt", rule.publishAt().toString(),
-                            "deadline", rule.deadline().toString(),
+                            "publishAt", strOrEmpty(rule.publishAt()),
+                            "deadline", strOrEmpty(rule.deadline()),
                             "maxSubmissions", rule.maxSubmissions(),
                             "mode", assignment.getMode().name()));
         }
@@ -234,17 +238,19 @@ public class AssignmentService {
     }
 
     private void validateRule(TargetRule rule) {
-        if (rule.publishAt() == null || rule.deadline() == null) {
-            throw new ApiException(ErrorCode.TARGET_RULE_INVALID, "必须提供发布时间窗口");
-        }
-        if (!rule.deadline().isAfter(rule.publishAt())) {
-            throw new ApiException(ErrorCode.TARGET_RULE_INVALID, "截止时间必须晚于发布时间");
-        }
+        validateTimes(rule.publishAt(), rule.deadline());
         if (rule.maxSubmissions() <= 0 || rule.maxSubmissions() > 1000) {
             throw new ApiException(ErrorCode.TARGET_RULE_INVALID, "最大提交次数必须在 [1, 1000] 内");
         }
         if (rule.scoringRules() != null && rule.scoringRules().length() > 512) {
             throw new ApiException(ErrorCode.TARGET_RULE_INVALID, "计分规则过长");
+        }
+    }
+
+    /** 时间窗口可留空（NULL 表示不限制）；两者均提供时截止必须晚于发布。 */
+    private void validateTimes(LocalDateTime publishAt, LocalDateTime deadline) {
+        if (publishAt != null && deadline != null && !deadline.isAfter(publishAt)) {
+            throw new ApiException(ErrorCode.TARGET_RULE_INVALID, "截止时间必须晚于发布时间");
         }
     }
 
@@ -307,23 +313,61 @@ public class AssignmentService {
         if (assignment.isExamLocked()) {
             examService.requireChangeAllowed(assignmentId, oj.exam.ExamService.ACTION_CHANGE_TARGET_RULES);
         }
+        validateTimes(newRule.publishAt(), newRule.deadline());
+        if (newRule.maxSubmissions() > 1000) {
+            throw new ApiException(ErrorCode.TARGET_RULE_INVALID, "最大提交次数必须在 [1, 1000] 内");
+        }
         AssignmentTarget target = requireTarget(assignmentId, teachingClassId);
         Map<String, Object> before = new LinkedHashMap<>();
-        before.put("publishAt", target.getPublishAt().toString());
-        before.put("deadline", target.getDeadline().toString());
+        before.put("publishAt", strOrEmpty(target.getPublishAt()));
+        before.put("deadline", strOrEmpty(target.getDeadline()));
         before.put("maxSubmissions", target.getMaxSubmissions());
         before.put("scoringRules", target.getScoringRules());
         before.put("version", target.getVersion());
         target.updateRules(newRule.publishAt(), newRule.deadline(),
                 newRule.maxSubmissions(), newRule.scoringRules());
         Map<String, Object> after = new LinkedHashMap<>();
-        after.put("publishAt", target.getPublishAt().toString());
-        after.put("deadline", target.getDeadline().toString());
+        after.put("publishAt", strOrEmpty(target.getPublishAt()));
+        after.put("deadline", strOrEmpty(target.getDeadline()));
         after.put("maxSubmissions", target.getMaxSubmissions());
         after.put("scoringRules", target.getScoringRules());
         after.put("version", target.getVersion());
         auditService.record(AuditActions.TARGET_RULES_UPDATED, "ASSIGNMENT_TARGET",
                 String.valueOf(target.getId()), before, after);
+        return target;
+    }
+
+    /**
+     * 立即收卷：把目标班级的截止时间置为当前时刻，此后学生不可再提交（仍可查看与成绩）。
+     * EXAM 已锁定须双人审批放行。
+     */
+    @Transactional
+    public AssignmentTarget collectTarget(Long assignmentId, Long teachingClassId) {
+        CurrentUser user = accessGuard.requireAdminOrTeacher();
+        Assignment assignment = requireAssignment(assignmentId);
+        if (user.isTeacher()) {
+            requireCreator(assignment, user);
+            classroomService.requirePrimaryAssignment(user.teacherId(), teachingClassId);
+        }
+        if (assignment.isExamLocked()) {
+            examService.requireChangeAllowed(assignmentId, oj.exam.ExamService.ACTION_CHANGE_TARGET_RULES);
+        }
+        AssignmentTarget target = requireTarget(assignmentId, teachingClassId);
+        if (target.getStatus() != AssignmentTarget.Status.PUBLISHED) {
+            throw new ApiException(ErrorCode.ASSIGNMENT_NOT_PUBLISHED, "目标班级已撤回");
+        }
+        LocalDateTime now = LocalDateTime.now(clock);
+        if (target.windowState(now) != AssignmentTarget.WindowState.OPEN) {
+            throw new ApiException(ErrorCode.TARGET_RULE_INVALID,
+                    target.windowState(now) == AssignmentTarget.WindowState.NOT_STARTED
+                            ? "作业尚未开始，暂不能收卷" : "作业已收卷");
+        }
+        Map<String, Object> before = Map.of("deadline", strOrEmpty(target.getDeadline()));
+        target.updateRules(target.getPublishAt(), now,
+                target.getMaxSubmissions(), target.getScoringRules());
+        auditService.record(AuditActions.ASSIGNMENT_TARGET_COLLECTED, "ASSIGNMENT_TARGET",
+                String.valueOf(target.getId()), before,
+                Map.of("deadline", now.toString()));
         return target;
     }
 
@@ -439,6 +483,10 @@ public class AssignmentService {
         if (!assignment.getCreatedBy().equals(user.teacherId())) {
             throw new ApiException(ErrorCode.FORBIDDEN);
         }
+    }
+
+    private static String strOrEmpty(LocalDateTime value) {
+        return value == null ? "" : value.toString();
     }
 
     /**

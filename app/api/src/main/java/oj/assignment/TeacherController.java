@@ -50,6 +50,7 @@ public class TeacherController {
     private final GradeExportService exportService;
     private final oj.export.ExportScheduler exportScheduler;
     private final AccessGuard accessGuard;
+    private final java.time.Clock clock;
 
     public TeacherController(ClassroomService classroomService,
                              ProblemService problemService,
@@ -57,7 +58,8 @@ public class TeacherController {
                              AnalyticsService analyticsService,
                              GradeExportService exportService,
                              oj.export.ExportScheduler exportScheduler,
-                             AccessGuard accessGuard) {
+                             AccessGuard accessGuard,
+                             java.time.Clock clock) {
         this.classroomService = classroomService;
         this.problemService = problemService;
         this.assignmentService = assignmentService;
@@ -65,6 +67,7 @@ public class TeacherController {
         this.exportService = exportService;
         this.exportScheduler = exportScheduler;
         this.accessGuard = accessGuard;
+        this.clock = clock;
     }
 
     // ---------------- 请求体 ----------------
@@ -97,8 +100,8 @@ public class TeacherController {
     public record PublishRequest(@NotNull List<TargetRuleDto> targets) {
     }
 
-    public record TargetRuleDto(@NotNull Long teachingClassId, @NotNull LocalDateTime publishAt,
-                                @NotNull LocalDateTime deadline, int maxSubmissions,
+    public record TargetRuleDto(@NotNull Long teachingClassId, LocalDateTime publishAt,
+                                LocalDateTime deadline, int maxSubmissions,
                                 String scoringRules) {
     }
 
@@ -231,8 +234,17 @@ public class TeacherController {
         var user = accessGuard.requireTeacher();
         List<Map<String, Object>> result = new ArrayList<>();
         for (Assignment a : assignmentService.myAssignments(user.teacherId())) {
-            result.add(Map.of("id", a.getId(), "title", a.getTitle(),
-                    "mode", a.getMode().name(), "status", a.getStatus().name()));
+            List<Map<String, Object>> targets = new ArrayList<>();
+            for (AssignmentTarget t : assignmentService.targets(a.getId())) {
+                targets.add(targetView(t));
+            }
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("id", a.getId());
+            item.put("title", a.getTitle());
+            item.put("mode", a.getMode().name());
+            item.put("status", a.getStatus().name());
+            item.put("targets", targets);
+            result.add(item);
         }
         return result;
     }
@@ -273,6 +285,12 @@ public class TeacherController {
     @PostMapping("/assignments/{id}/targets/{classId}/withdraw")
     public Map<String, Object> withdrawTarget(@PathVariable Long id, @PathVariable Long classId) {
         AssignmentTarget t = assignmentService.withdrawTarget(id, classId);
+        return targetView(t);
+    }
+
+    @PostMapping("/assignments/{id}/targets/{classId}/collect")
+    public Map<String, Object> collectTarget(@PathVariable Long id, @PathVariable Long classId) {
+        AssignmentTarget t = assignmentService.collectTarget(id, classId);
         return targetView(t);
     }
 
@@ -370,11 +388,12 @@ public class TeacherController {
         view.put("assignmentId", t.getAssignmentId());
         view.put("teachingClassId", t.getTeachingClassId());
         view.put("status", t.getStatus().name());
-        view.put("publishAt", t.getPublishAt().toString());
-        view.put("deadline", t.getDeadline().toString());
+        view.put("publishAt", t.getPublishAt() == null ? null : t.getPublishAt().toString());
+        view.put("deadline", t.getDeadline() == null ? null : t.getDeadline().toString());
         view.put("maxSubmissions", t.getMaxSubmissions());
         view.put("scoringRules", t.getScoringRules());
         view.put("version", t.getVersion());
+        view.put("window", t.windowState(LocalDateTime.now(clock)).name());
         return view;
     }
 }
