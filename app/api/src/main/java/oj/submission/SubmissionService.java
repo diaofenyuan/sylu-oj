@@ -83,6 +83,9 @@ public class SubmissionService {
         AssignmentTarget target = assignmentService.requireAccessibleTargetForStudent(
                 studentId, command.assignmentTargetId());
         LocalDateTime now = LocalDateTime.now(clock);
+        if (target.windowState(now) == AssignmentTarget.WindowState.NOT_STARTED) {
+            throw new ApiException(ErrorCode.ASSIGNMENT_NOT_STARTED);
+        }
         if (!target.isOpenAt(now)) {
             throw new ApiException(ErrorCode.WINDOW_CLOSED);
         }

@@ -18,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
@@ -275,10 +276,15 @@ public class AssignmentService {
                     "timeLimitMs", problem.getTimeLimitMs(),
                     "memoryLimitMb", problem.getMemoryLimitMb(),
                     "outputLimitKb", problem.getOutputLimitKb(),
-                    "maxScore", problem.getMaxScore()));
+                    "maxScore", integralScore(problem.getMaxScore())));
         } catch (JsonProcessingException e) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR);
         }
+    }
+
+    /** 判题配置契约：maxScore 以整型下发（judge agent 按 int64 解析，禁止 100.00 等小数形式）。 */
+    private static long integralScore(BigDecimal score) {
+        return score == null ? 0L : score.setScale(0, RoundingMode.HALF_UP).longValueExact();
     }
 
     private String checksum(Problem problem, TestcaseSet testcaseSet) {

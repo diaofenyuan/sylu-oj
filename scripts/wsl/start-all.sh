@@ -22,7 +22,8 @@ start_bg() { # name, pidfile, command...
 # must run inside the WSL-native repo, never on /mnt/d via 9p)
 cd "$REPO/app/api"
 start_bg backend "$LOG/backend.pid" env \
-  JAVA_HOME="$OPT/jdk17" "$OPT/jdk17/bin/java" -jar \
+  JAVA_HOME="$OPT/jdk17" PATH="$OPT/jdk17/bin:$PATH" \
+  "$OPT/jdk17/bin/java" -jar \
   "$REPO/app/api/target/oj-api-0.4.0.jar" --spring.profiles.active=dev
 
 # web (vite preview serves built dist, proxies /api to localhost:8080)

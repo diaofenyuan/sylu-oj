@@ -15,6 +15,7 @@ if [ -f "$PIDFILE" ] && kill -0 "$(cat "$PIDFILE")" 2>/dev/null; then
 fi
 
 set -a; . "$ENVFILE"; set +a
+export PATH="$HOME/opt/jdk17/bin:$PATH"
 setsid nohup "$REPO/var/bin/oj-agent-linux" >>"$LOG/agent.log" 2>&1 </dev/null &
 echo $! > "$PIDFILE"
 echo "[agent] started (pid $!, gateway=$OJ_GATEWAY_URL)"
