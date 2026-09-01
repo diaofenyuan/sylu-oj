@@ -200,17 +200,11 @@ public class StudentController {
     }
 
     @GetMapping("/submissions")
-    /** 未到发布时间（定时发布）一律拒绝进入/浏览；已截止仍允许查看题目与成绩复核。 */
-    private void requireStarted(AssignmentTarget target) {
-        if (target.windowState(LocalDateTime.now(clock)) == AssignmentTarget.WindowState.NOT_STARTED) {
-            throw new ApiException(ErrorCode.ASSIGNMENT_NOT_STARTED);
-        }
-    }
-
     public List<Map<String, Object>> mySubmissions(@RequestParam Long assignmentTargetId,
                                                    @RequestParam(required = false) Long problemId) {
         var user = accessGuard.requireStudent();
-        assignmentService.requireAccessibleTargetForStudent(user.studentId(), assignmentTargetId);
+        AssignmentTarget target = assignmentService.requireAccessibleTargetForStudent(user.studentId(), assignmentTargetId);
+        requireStarted(target);
         List<Map<String, Object>> result = new ArrayList<>();
         for (Submission s : submissionService.mySubmissions(user.studentId(), assignmentTargetId, problemId)) {
             Map<String, Object> item = new LinkedHashMap<>();
@@ -228,6 +222,13 @@ public class StudentController {
             result.add(item);
         }
         return result;
+    }
+
+    /** 未到发布时间（定时发布）一律拒绝进入/浏览；已截止仍允许查看题目与成绩复核。 */
+    private void requireStarted(AssignmentTarget target) {
+        if (target.windowState(LocalDateTime.now(clock)) == AssignmentTarget.WindowState.NOT_STARTED) {
+            throw new ApiException(ErrorCode.ASSIGNMENT_NOT_STARTED);
+        }
     }
 
     /**
