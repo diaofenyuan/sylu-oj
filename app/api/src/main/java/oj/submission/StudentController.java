@@ -107,7 +107,7 @@ public class StudentController {
             item.put("problemId", snapshot.getProblemId());
             item.put("title", snapshot.getTitle());
             item.put("description", snapshot.getDescription());
-            item.put("languages", snapshot.getLanguages());
+            item.put("languages", snapshot.getLanguages().split(","));
             item.put("judgeConfig", snapshot.getJudgeConfig());
             List<Map<String, Object>> samples = new ArrayList<>();
             for (Testcase tc : problemService.sampleTestcases(snapshot.getTestcaseSetId())) {
