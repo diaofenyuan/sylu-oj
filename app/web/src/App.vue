@@ -14,10 +14,12 @@
         <router-link to="/admin">管理控制台</router-link>
         <router-link to="/teacher/classes">授课班级</router-link>
         <router-link to="/teacher/assignment">组卷发布</router-link>
+        <router-link to="/teacher/assignments">作业管理</router-link>
       </nav>
       <nav v-else-if="authed">
         <router-link to="/teacher/classes">授课班级</router-link>
         <router-link to="/teacher/assignment">组卷发布</router-link>
+        <router-link to="/teacher/assignments">作业管理</router-link>
       </nav>
       <div class="spacer"></div>
       <button v-if="authed" class="secondary" @click="logout">退出登录</button>

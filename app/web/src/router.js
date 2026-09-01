@@ -4,6 +4,7 @@ import AdminHome from './views/admin/AdminHome.vue'
 import TeacherClasses from './views/teacher/Classes.vue'
 import TeacherProblemBank from './views/teacher/ProblemBank.vue'
 import TeacherAssignmentEditor from './views/teacher/AssignmentEditor.vue'
+import TeacherAssignmentsManage from './views/teacher/AssignmentsManage.vue'
 import TeacherAnalytics from './views/teacher/Analytics.vue'
 import StudentHome from './views/student/StudentHome.vue'
 import StudentAssignment from './views/student/StudentAssignment.vue'
@@ -22,6 +23,7 @@ const router = createRouter({
     { path: '/teacher/classes', component: TeacherClasses, meta: { area: 'teacher' } },
     { path: '/teacher/classes/:classId/problems', component: TeacherProblemBank, meta: { area: 'teacher' } },
     { path: '/teacher/assignment', component: TeacherAssignmentEditor, meta: { area: 'teacher' } },
+    { path: '/teacher/assignments', component: TeacherAssignmentsManage, meta: { area: 'teacher' } },
     { path: '/teacher/analytics/:targetId', component: TeacherAnalytics, meta: { area: 'teacher' } },
     { path: '/student', component: StudentHome, meta: { area: 'student' } },
     { path: '/student/practice', component: StudentPractice, meta: { area: 'student' } },

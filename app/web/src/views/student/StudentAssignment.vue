@@ -1,5 +1,9 @@
 <template>
-  <ProblemWorkbench v-if="info" mode="assignment" :target-id="targetId" :title="info.title" :meta="meta" />
+  <ProblemWorkbench v-if="info && info.window !== 'NOT_STARTED'" mode="assignment"
+                    :target-id="targetId" :title="info.title" :meta="meta" />
+  <div v-else-if="info" class="empty">
+    作业尚未开始（{{ info.publishAt ? fmt(info.publishAt) : '' }} 发布），到点后自动开放
+  </div>
   <div v-else class="empty">{{ loading ? '加载中…' : '作业不存在或不可访问' }}</div>
 </template>
 
@@ -23,7 +27,9 @@ onMounted(async () => {
     if (info.value) {
       meta.value = {
         mode: info.value.mode,
+        publishAt: info.value.publishAt,
         deadline: info.value.deadline,
+        window: info.value.window,
         attemptCount: info.value.attemptCount,
         maxSubmissions: info.value.maxSubmissions
       }
@@ -32,4 +38,8 @@ onMounted(async () => {
     loading.value = false
   }
 })
+
+function fmt(s) {
+  return s ? s.replace('T', ' ').slice(0, 16) : ''
+}
 </script>

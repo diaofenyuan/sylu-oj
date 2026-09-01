@@ -26,8 +26,11 @@
           <span class="chip" :class="meta.mode === 'EXAM' ? 'chip-warn' : 'chip-primary'">
             {{ meta.mode === 'EXAM' ? '正式考试' : '普通作业' }}
           </span>
+          <span class="chip" :class="winClass(meta.window)">{{ winLabel(meta.window) }}</span>
+          <span class="meta-item" v-if="meta.publishAt">发布：{{ fmtTime(meta.publishAt).slice(0, 16) }}</span>
           <span class="meta-item" v-if="meta.deadline">截止：{{ fmtTime(meta.deadline).slice(0, 16) }}</span>
           <span class="meta-item" v-if="meta.maxSubmissions">已提交 {{ meta.attemptCount ?? 0 }}/{{ meta.maxSubmissions }} 次</span>
+          <span v-if="meta.window === 'CLOSED'" class="meta-item closed-tip">已收卷，禁止提交（可查看题目与成绩）</span>
         </div>
         <template v-if="selected">
           <header class="pr-head">
@@ -93,11 +96,12 @@
             </button>
             <span class="spacer"></span>
             <button class="mini-btn" @click="panelOpen = !panelOpen">{{ panelOpen ? '▾ 收起' : '▴ 展开' }}</button>
-            <button class="run-btn" :disabled="running || !selected" @click="runFromButton">
+            <button class="run-btn" :disabled="running || !selected || !canSubmitNow" @click="runFromButton">
               {{ running ? '运行中…' : '自测运行' }}
             </button>
-            <button class="submit-btn" :disabled="submitting || !selected || !code.trim()" @click="submit">
-              {{ submitting ? '提交中…' : '保存并提交' }}
+            <button class="submit-btn"
+                    :disabled="submitting || !selected || !code.trim() || !canSubmitNow" @click="submit">
+              {{ submitting ? '提交中…' : canSubmitNow ? '保存并提交' : '窗口未开放' }}
             </button>
           </div>
 
@@ -233,6 +237,8 @@ const props = defineProps({
   meta: { type: Object, default: null }
 })
 const isAssignment = computed(() => props.mode === 'assignment')
+const canSubmitNow = computed(() =>
+  !isAssignment.value || (props.meta && props.meta.window === 'OPEN'))
 
 // VS Code Dark+ 风格的主题
 const vscodeTheme = [
@@ -369,6 +375,8 @@ function displayCode(problem) {
 }
 
 function difficultyLabel(key) { return levels.find(level => level.key === key)?.label || key }
+function winLabel(w) { return ({ NOT_STARTED: '未开始', OPEN: '进行中', CLOSED: '已截止' })[w] || w }
+function winClass(w) { return ({ NOT_STARTED: 'chip-warn', OPEN: 'chip-ok', CLOSED: 'chip-muted' })[w] || 'chip-muted' }
 function diffChipClass(key) { return ({ EASY: 'chip-ok', BASIC: 'chip-primary', INTERMEDIATE: 'chip-warn', HARD: 'chip-bad' })[key] || 'chip-muted' }
 function levelCount(key) { return problems.value.filter(problem => problem.difficulty === key).length }
 function levelPassed(key) { return problems.value.filter(problem => problem.difficulty === key && problem.status === 'AC').length }
@@ -565,7 +573,7 @@ function clearPoll() {
 }
 
 async function submit() {
-  if (!selected.value || !code.value.trim()) return
+  if (!selected.value || !code.value.trim() || !canSubmitNow.value) return
   localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
   submitting.value = true
   try {
@@ -755,6 +763,7 @@ onBeforeUnmount(() => {
 .sample-io span { font-size: 11.5px; color: var(--muted); padding-top: 2px; }
 .sample-io pre { margin: 0; font: 12.5px/1.55 Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
 .pr-tip { margin-top: 20px; font-size: 12.5px; color: var(--muted); }
+.closed-tip { color: var(--danger); font-weight: 600; }
 .pr-empty { flex: 1; display: grid; place-items: center; color: var(--muted); padding: 30px; }
 
 .wb-splitter {

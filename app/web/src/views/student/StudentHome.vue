@@ -10,15 +10,21 @@
         <span class="chip" :class="a.mode === 'EXAM' ? 'chip-warn' : 'chip-primary'">
           {{ a.mode === 'EXAM' ? '正式考试' : '普通作业' }}
         </span>
+        <span class="chip" :class="winClass(a.window)">{{ winLabel(a.window) }}</span>
         <div class="asg-info">
           <strong>{{ a.title }}</strong>
-          <span class="muted">截止：{{ fmt(a.deadline) }}</span>
+          <span class="muted">
+            发布：{{ a.publishAt ? fmt(a.publishAt) : '不限' }}
+            · 截止：{{ a.deadline ? fmt(a.deadline) : '不限' }}
+          </span>
         </div>
         <div class="spacer"></div>
         <div class="asg-meta">
           <span class="muted attempts">已提交 {{ a.attemptCount }}/{{ a.maxSubmissions }} 次</span>
           <router-link :to="`/student/targets/${a.targetId}`">
-            <button>进入作业 →</button>
+            <button :disabled="a.window === 'NOT_STARTED'">
+              {{ a.window === 'NOT_STARTED' ? '未开始' : '进入作业 →' }}
+            </button>
           </router-link>
         </div>
       </div>
@@ -37,6 +43,12 @@ const loading = ref(true)
 
 function fmt(s) {
   return s ? s.replace('T', ' ').slice(0, 16) : ''
+}
+function winLabel(w) {
+  return ({ NOT_STARTED: '未开始', OPEN: '进行中', CLOSED: '已截止' })[w] || w
+}
+function winClass(w) {
+  return ({ NOT_STARTED: 'chip-warn', OPEN: 'chip-ok', CLOSED: 'chip-muted' })[w] || 'chip-muted'
 }
 
 onMounted(async () => {

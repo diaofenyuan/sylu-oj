@@ -89,8 +89,16 @@
         <button class="secondary" :disabled="!targetPick" @click="addTarget">+ 添加</button>
       </div>
 
+      <div class="row pick-bar uniform-bar">
+        <span class="muted">统一时间（留空表示不限时，发布后还可修改/立即收卷）：</span>
+        <input v-model="uniformPublishAt" type="datetime-local" aria-label="统一发布时间" />
+        <span class="muted">—</span>
+        <input v-model="uniformDeadline" type="datetime-local" aria-label="统一截止时间" />
+        <button class="secondary slim-btn" @click="applyUniform">应用到全部班级</button>
+      </div>
+
       <table v-if="targets.length">
-        <thead><tr><th>班级</th><th>发布时间</th><th>截止时间</th><th style="width: 130px;">最大提交次数</th><th style="width: 60px;"></th></tr></thead>
+        <thead><tr><th>班级</th><th>发布时间（可选）</th><th>截止时间（可选）</th><th style="width: 130px;">最大提交次数</th><th style="width: 60px;"></th></tr></thead>
         <tbody>
           <tr v-for="(t, i) in targets" :key="t.teachingClassId">
             <td>{{ className(t.teachingClassId) }}</td>
@@ -136,6 +144,8 @@ const weights = ref({})
 
 const targets = ref([])
 const targetPick = ref('')
+const uniformPublishAt = ref('')
+const uniformDeadline = ref('')
 
 const msg = ref('')
 const errMsg = ref('')
@@ -157,7 +167,7 @@ const itemsReady = computed(() =>
 )
 const targetsReady = computed(() =>
   targets.value.length > 0 &&
-  targets.value.every(t => t.teachingClassId && t.publishAt && t.deadline && Number(t.maxSubmissions) > 0)
+  targets.value.every(t => t.teachingClassId && Number(t.maxSubmissions) > 0)
 )
 const canPublish = computed(() => itemsReady.value && targetsReady.value)
 
@@ -248,6 +258,26 @@ async function saveDraft() {
   } catch (e) { fail(e) }
 }
 
+function addTarget() {
+  const id = Number(targetPick.value)
+  if (!id || targetClassIds.value.has(id)) return
+  targets.value.push({
+    teachingClassId: id,
+    publishAt: uniformPublishAt.value,
+    deadline: uniformDeadline.value,
+    maxSubmissions: 50
+  })
+  targetPick.value = ''
+}
+
+function applyUniform() {
+  for (const t of targets.value) {
+    t.publishAt = uniformPublishAt.value
+    t.deadline = uniformDeadline.value
+  }
+  notify('统一时间已应用到全部班级（若已有时间将被覆盖）')
+}
+
 async function saveAndPublish() {
   try {
     if (!draftId.value) {
@@ -262,8 +292,8 @@ async function saveAndPublish() {
       body: {
         targets: targets.value.map(t => ({
           teachingClassId: Number(t.teachingClassId),
-          publishAt: normTime(t.publishAt),
-          deadline: normTime(t.deadline),
+          publishAt: t.publishAt ? normTime(t.publishAt) : null,
+          deadline: t.deadline ? normTime(t.deadline) : null,
           maxSubmissions: Number(t.maxSubmissions)
         }))
       }
@@ -309,6 +339,11 @@ async function loadDraft() {
         deadline: sliceTime(t.deadline),
         maxSubmissions: t.maxSubmissions
       }))
+    const dts = d.targets.filter(t => t.status !== 'WITHDRAWN')
+    if (dts.length === 1) {
+      uniformPublishAt.value = sliceTime(dts[0].publishAt)
+      uniformDeadline.value = sliceTime(dts[0].deadline)
+    }
     draftPick.value = ''
     notify('已载入试卷 #' + d.id + '（' + statusLabel(d.status) + '）')
   } catch (e) { fail(e) }
@@ -321,6 +356,8 @@ function resetEditor() {
   picked.value = []
   weights.value = {}
   targets.value = []
+  uniformPublishAt.value = ''
+  uniformDeadline.value = ''
   notify('已切换为新建试卷')
 }
 
@@ -369,6 +406,7 @@ function sliceTime(v) { return v ? String(v).slice(0, 16) : '' }
 }
 .chip-x:hover { background: none; color: var(--danger); }
 .action-row { margin-top: 16px; }
+.uniform-bar { align-items: center; flex-wrap: wrap; }
 input[type="datetime-local"] { padding: 7px 10px; }
 .ok-banner {
   background: var(--ok-soft);
