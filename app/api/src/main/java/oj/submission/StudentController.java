@@ -74,7 +74,7 @@ public class StudentController {
         this.classroomService = classroomService;
         this.counterRepository = counterRepository;
         this.judgeResultRepository = judgeResultRepository;
-        this.localCodeRunner = localCodeRunner;
+        this.judgeRunService = judgeRunService;
         this.accessGuard = accessGuard;
         this.localRunEnabled = localRunEnabled;
         this.clock = clock;
