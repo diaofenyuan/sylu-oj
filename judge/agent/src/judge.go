@@ -226,3 +226,73 @@ func (j *Judge) seResult(task *Task) *CaseResultSubmission {
 		Testcases:       outcomes,
 	}
 }
+
+// RunOnce 执行一次"自测运行"：与判题共用同一编译/沙盒执行器与资源测量，
+// 仅单份输入、无判题比对与计分；输出与错误回传给学生。
+func (j *Judge) RunOnce(ctx context.Context, task *RunTask) *RunResult {
+	lang, ok := j.policy.Languages[task.Language]
+	if !ok {
+		return &RunResult{RunUuid: task.RunUuid, CompileError: "语言策略未定义语言 " + task.Language}
+	}
+	image, err := j.policy.ImageFor(task.LanguageRuntime)
+	if err != nil {
+		return &RunResult{RunUuid: task.RunUuid, CompileError: err.Error()}
+	}
+	var snap snapshotLimits
+	if err := json.Unmarshal([]byte(task.JudgeConfig), &snap); err != nil {
+		return &RunResult{RunUuid: task.RunUuid, CompileError: "判题配置解析失败: " + err.Error()}
+	}
+
+	productFiles := map[string][]byte{}
+	if lang.Compile != nil {
+		compileRes, err := j.runner.Execute(ctx, sandbox.ExecSpec{
+			Image:   image,
+			Argv:    lang.Compile.Argv,
+			Files:   map[string][]byte{lang.Compile.Source: []byte(task.Code)},
+			Harvest: []string{lang.Compile.Product},
+			Workdir: "/workspace",
+		}, compileLimits(lang.Compile))
+		if err != nil {
+			return &RunResult{RunUuid: task.RunUuid, CompileError: "编译沙箱执行失败: " + err.Error(),
+				SandboxMode: j.sandboxMode}
+		}
+		if compileRes.ExitCode != 0 || compileRes.TimedOut || compileRes.OOMKilled {
+			return &RunResult{RunUuid: task.RunUuid,
+				CompileError: string(compileRes.Stderr),
+				ExitCode:     compileRes.ExitCode, TotalTimeMs: compileRes.WallTimeMs,
+				PeakMemoryKb: compileRes.PeakMemoryKb, TimedOut: compileRes.TimedOut,
+				SandboxMode: j.sandboxMode}
+		}
+		if len(compileRes.Files) == 0 {
+			return &RunResult{RunUuid: task.RunUuid, CompileError: "编译产物缺失（写层回收为空）",
+				SandboxMode: j.sandboxMode}
+		}
+		productFiles = compileRes.Files
+	}
+
+	files := map[string][]byte{}
+	for name, content := range productFiles {
+		files[name] = content
+	}
+	runRes, err := j.runner.Execute(ctx, sandbox.ExecSpec{
+		Image:   image,
+		Argv:    lang.Run.Argv,
+		Files:   files,
+		Stdin:   []byte(task.Input),
+		Workdir: "/workspace",
+	}, runLimits(lang.Run, snap))
+	if err != nil {
+		return &RunResult{RunUuid: task.RunUuid, CompileError: "运行沙箱执行失败: " + err.Error(),
+			SandboxMode: j.sandboxMode}
+	}
+	return &RunResult{
+		RunUuid:      task.RunUuid,
+		Output:       string(runRes.Output),
+		Stderr:       string(runRes.Stderr),
+		ExitCode:     runRes.ExitCode,
+		TotalTimeMs:  runRes.WallTimeMs,
+		PeakMemoryKb: runRes.PeakMemoryKb,
+		TimedOut:     runRes.TimedOut,
+		SandboxMode:  j.sandboxMode,
+	}
+}

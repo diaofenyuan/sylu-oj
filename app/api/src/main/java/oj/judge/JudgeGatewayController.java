@@ -32,6 +32,7 @@ public class JudgeGatewayController {
     private final TestcaseDistributionService distributionService;
     private final JudgeResultGatewayService resultGatewayService;
     private final JudgeAgentService agentService;
+    private final JudgeRunService runService;
     private final Clock clock;
     private final int maxWaitSeconds;
     private final boolean registrationEnabled;
@@ -41,6 +42,7 @@ public class JudgeGatewayController {
                                   TestcaseDistributionService distributionService,
                                   JudgeResultGatewayService resultGatewayService,
                                   JudgeAgentService agentService,
+                                  JudgeRunService runService,
                                   Clock clock,
                                   @Value("${oj.judge.claim-max-wait-seconds:25}") int maxWaitSeconds,
                                   @Value("${oj.dev-internal-api.enabled:false}") boolean registrationEnabled,
@@ -49,6 +51,7 @@ public class JudgeGatewayController {
         this.distributionService = distributionService;
         this.resultGatewayService = resultGatewayService;
         this.agentService = agentService;
+        this.runService = runService;
         this.clock = clock;
         this.maxWaitSeconds = maxWaitSeconds;
         this.registrationEnabled = registrationEnabled;
@@ -152,5 +155,46 @@ public class JudgeGatewayController {
                 "resultCode", outcome.result().getResultCode(),
                 "resultVersion", outcome.result().getResultVersion(),
                 "duplicate", outcome.duplicate()));
+    }
+
+    /** 自测运行：Agent 长轮询领取（与判题任务同一认证通道，不计分、不落库）。 */
+    @PostMapping("/runs/claim")
+    public ResponseEntity<JudgeRunService.RunTaskPayload> claimRun(
+            @RequestHeader(value = "X-Agent-Id", required = false) String agentId,
+            @RequestHeader(value = "X-Agent-Token", required = false) String agentToken,
+            @RequestBody(required = false) ClaimRequest request) {
+        requireAgentCredentials(agentId, agentToken);
+        agentService.authenticate(agentId, agentToken);
+        int wait = Math.min(request == null || request.waitSeconds() == null ? 0 : request.waitSeconds(),
+                maxWaitSeconds);
+        LocalDateTime deadline = LocalDateTime.now(clock).plusSeconds(wait);
+        while (true) {
+            JudgeRunService.RunTaskPayload payload = runService.claim(agentId);
+            if (payload != null) {
+                return ResponseEntity.ok(payload);
+            }
+            if (!LocalDateTime.now(clock).isBefore(deadline)) {
+                return ResponseEntity.noContent().build();
+            }
+            try {
+                Thread.sleep(300);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return ResponseEntity.noContent().build();
+            }
+        }
+    }
+
+    /** 自测运行结果回传：校验认领人并唤醒等待方。 */
+    @PostMapping("/runs/{runUuid}/result")
+    public Map<String, Object> runResult(
+            @RequestHeader(value = "X-Agent-Id", required = false) String agentId,
+            @RequestHeader(value = "X-Agent-Token", required = false) String agentToken,
+            @PathVariable String runUuid,
+            @RequestBody JudgeRunService.RunResultPayload request) {
+        requireAgentCredentials(agentId, agentToken);
+        agentService.authenticate(agentId, agentToken);
+        runService.complete(agentId, runUuid, request);
+        return Map.of("ok", true);
     }
 }

@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
@@ -89,10 +90,11 @@ func (r *HostRunner) Execute(ctx context.Context, spec ExecSpec, limits Limits) 
 
 	res := &ExecResult{
 		Output:       stdout.truncated(),
+		Stderr:       stderr.truncated(),
 		OutputLimit:  stdout.hitLimit || stderr.hitLimit,
 		StderrBytes:  int64(stderr.written),
 		WallTimeMs:   wall,
-		PeakMemoryKb: 0, // 宿主机直执行无法读取 cgroup 峰值（仅 dev）
+		PeakMemoryKb: peakRss(cmd),
 	}
 	// 在销毁临时目录前回收 Harvest 文件（编译产物）。
 	res.Files = harvestFiles(work, spec.Harvest)
@@ -109,4 +111,22 @@ func (r *HostRunner) Execute(ctx context.Context, spec ExecSpec, limits Limits) 
 		return res, nil
 	}
 	return nil, fmt.Errorf("host-dev 执行失败: %w", runErr)
+}
+
+// peakRss 从 wait4 rusage（ProcessState.SysUsage）读取进程峰值驻留内存（KB）。
+// 与 /usr/bin/time -v 的 Maximum resident set size 同源，含运行时底座，
+// 与真实 OJ 的沙盒内存口径一致；无可用指标时返回 0。
+func peakRss(cmd *exec.Cmd) int64 {
+	if cmd.ProcessState == nil {
+		return 0
+	}
+	usage, ok := cmd.ProcessState.SysUsage().(*syscall.Rusage)
+	if !ok {
+		return 0
+	}
+	// Linux wait4 rusage 的 ru_maxrss 单位为 KB；BSD 系为字节（按字节尺度区分）。
+	if usage.Maxrss > (1 << 30) {
+		return usage.Maxrss / 1024
+	}
+	return usage.Maxrss
 }

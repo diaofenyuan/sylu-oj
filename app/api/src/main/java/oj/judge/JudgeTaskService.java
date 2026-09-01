@@ -45,6 +45,11 @@ public class JudgeTaskService {
         return java.util.Set.copyOf(RUNTIMES.values());
     }
 
+    /** 语言 → 固定运行时标识（与 RUNTIMES 一致；未知语言返回 unknown-runtime 由策略校验拒绝）。 */
+    public static String runtimeFor(String language) {
+        return RUNTIMES.getOrDefault(language, "unknown-runtime");
+    }
+
     private final JudgeTaskRepository taskRepository;
     private final JudgeOutboxRepository outboxRepository;
     private final ProblemSnapshotRepository snapshotRepository;
@@ -141,7 +146,7 @@ public class JudgeTaskService {
     }
 
     private JudgeTask newTask(Submission submission, ProblemSnapshot snapshot, int attempt) {
-        String runtime = RUNTIMES.getOrDefault(submission.getLanguage(), "unknown-runtime");
+        String runtime = runtimeFor(submission.getLanguage());
         JudgeTask task = new JudgeTask(UUID.randomUUID().toString(), submission.getId(),
                 snapshot.getAssignmentId(), submission.getAssignmentTargetId(), submission.getProblemId(),
                 snapshot.getId(), snapshot.getProblemVersion(), snapshot.getTestcaseSetId(),

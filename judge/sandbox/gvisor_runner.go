@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 )
 
@@ -101,8 +100,10 @@ func (r *GVisorRunner) Execute(ctx context.Context, spec ExecSpec, limits Limits
 	if apparmor == "" {
 		apparmor = r.apparmorProf
 	}
+	// 一次性容器：create（不 --rm，容器 cgroup 保留到显式 rm）+ attach 注入 stdin
+	// + 退出后读 cgroup memory.peak（v2，内核 5.19+）+ rm 清理。
 	argv := []string{
-		"run", "--rm",
+		"create",
 		"--runtime", r.runscRuntime,
 		"--network", "none", // 无网卡/路由/DNS
 		"--read-only", // 只读根文件系统
@@ -125,10 +126,20 @@ func (r *GVisorRunner) Execute(ctx context.Context, spec ExecSpec, limits Limits
 
 	execCtx, cancel := context.WithDeadline(ctx, limits.Deadline())
 	defer cancel()
-	cmd := exec.CommandContext(execCtx, r.podmanBin, argv...)
-	cmd.Dir = ""
+	create := exec.CommandContext(execCtx, r.podmanBin, argv...)
+	var idBuf bytes.Buffer
+	create.Stdout = &idBuf
+	if err := create.Run(); err != nil {
+		return nil, fmt.Errorf("创建判题容器失败: %w", err)
+	}
+	containerID := strings.TrimSpace(idBuf.String())
+	if containerID == "" {
+		return nil, fmt.Errorf("创建判题容器失败：未取得容器 ID")
+	}
+	defer r.removeContainer(execCtx, containerID)
+
+	cmd := exec.CommandContext(execCtx, r.podmanBin, "start", "--attach", "--interactive", containerID)
 	cmd.Env = append(os.Environ(), "_CONTAINERS_USERNS_CONFIGURED=1")
-	cmd.SysProcAttr = &syscall.SysProcAttr{}
 	if len(spec.Stdin) > 0 {
 		cmd.Stdin = bytes.NewReader(spec.Stdin)
 	}
@@ -145,10 +156,11 @@ func (r *GVisorRunner) Execute(ctx context.Context, spec ExecSpec, limits Limits
 
 	res := &ExecResult{
 		Output:       stdout.truncated(),
+		Stderr:       stderr.truncated(),
 		OutputLimit:  stdout.hitLimit || stderr.hitLimit,
 		StderrBytes:  int64(stderr.written),
 		WallTimeMs:   wall,
-		PeakMemoryKb: 0, // runsc 内存峰值由 cgroups memory.peak 读取（部署阶段启用）
+		PeakMemoryKb: cgroupPeakKb(containerID, r.podmanBin, execCtx),
 	}
 	// 在销毁临时写层宿主目录前回收 Harvest 文件（编译产物）。
 	res.Files = harvestFiles(work, spec.Harvest)
@@ -271,4 +283,36 @@ func signalName(ee *exec.ExitError) string {
 	default:
 		return ""
 	}
+}
+
+// removeContainer 尽力清理一次性容器（最终保证无 --rm 依赖）。
+func (r *GVisorRunner) removeContainer(ctx context.Context, id string) {
+	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	_ = exec.CommandContext(ctx, r.podmanBin, "rm", "-f", id).Run()
+}
+
+// cgroupPeakKb 读取容器 cgroup v2 memory.peak（单位字节 → KB）。
+// 失败（非 cgroup v2/旧内核/rootless 无 delegation）时返回 0，不阻塞判题。
+func cgroupPeakKb(containerID, podmanBin string, ctx context.Context) int64 {
+	cg, err := exec.CommandContext(ctx, podmanBin, "inspect", "--format",
+		"{{.State.CgroupPath}}", containerID).Output()
+	if err != nil || len(bytes.TrimSpace(cg)) == 0 {
+		return 0
+	}
+	path := strings.TrimSpace(string(cg))
+	peakPath := path + "/memory.peak"
+	raw, err := os.ReadFile(peakPath)
+	if err != nil {
+		peakPath = path + "/memory.max_usage_in_bytes" // cgroup v1 兼容
+		raw, err = os.ReadFile(peakPath)
+		if err != nil {
+			return 0
+		}
+	}
+	peak, err := strconv.ParseInt(strings.TrimSpace(string(raw)), 10, 64)
+	if err != nil {
+		return 0
+	}
+	return peak / 1024
 }

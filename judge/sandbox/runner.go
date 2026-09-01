@@ -63,6 +63,7 @@ type ExecResult struct {
 	CpuTimeMs    int64
 	WallTimeMs   int64
 	Output       []byte // 截断至 OutputBytes 的 stdout（stderr 单独计）
+	Stderr       []byte // 截断至 OutputBytes 的 stderr（自测运行/编译错误展示用）
 	StderrBytes  int64
 	// Files 为按 ExecSpec.Harvest 回收的临时写层文件（编译产物）。
 	Files map[string][]byte

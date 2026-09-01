@@ -260,6 +260,58 @@ func (c *TestcaseClient) SubmitResult(taskUuid string, sub *CaseResultSubmission
 	return err
 }
 
+// ---- 自测运行通道（dev/内测：学生自测运行与判题共用同一沙箱执行器） ----
+
+// RunTask 是自测运行任务载荷：代码 + 单份输入，不含判题用例与计分。
+type RunTask struct {
+	RunUuid         string `json:"runUuid"`
+	Language        string `json:"language"`
+	LanguageRuntime string `json:"languageRuntime"`
+	JudgeConfig     string `json:"judgeConfig"`
+	Code            string `json:"code"`
+	Input           string `json:"input"`
+}
+
+// RunResult 为自测运行结果回传体（不计分，无需 HMAC 签名；仅供学生自测）。
+type RunResult struct {
+	RunUuid      string `json:"runUuid"`
+	Output       string `json:"output"`
+	Stderr       string `json:"stderr"`
+	CompileError string `json:"compileError"`
+	ExitCode     int    `json:"exitCode"`
+	TotalTimeMs  int64  `json:"totalTimeMs"`
+	PeakMemoryKb int64  `json:"peakMemoryKb"`
+	TimedOut     bool   `json:"timedOut"`
+	SandboxMode  string `json:"sandboxMode,omitempty"`
+}
+
+// ClaimRunTask 长轮询领取一个自测运行任务；无任务（204）返回 nil。
+func (c *TestcaseClient) ClaimRunTask(waitSeconds int) (*RunTask, error) {
+	body, status, err := c.postWithStatus("/runs/claim",
+		[]byte(fmt.Sprintf(`{"waitSeconds":%d}`, waitSeconds)))
+	if err != nil {
+		return nil, err
+	}
+	if status == 204 || len(bytes.TrimSpace(body)) == 0 {
+		return nil, nil
+	}
+	var task RunTask
+	if err := json.Unmarshal(body, &task); err != nil {
+		return nil, fmt.Errorf("自测运行任务解析失败: %w", err)
+	}
+	return &task, nil
+}
+
+// SubmitRunResult 回传自测运行结果。
+func (c *TestcaseClient) SubmitRunResult(res *RunResult) error {
+	payload, err := json.Marshal(res)
+	if err != nil {
+		return err
+	}
+	_, _, err = c.postWithStatus("/runs/"+res.RunUuid+"/result", payload)
+	return err
+}
+
 func zero(b []byte) {
 	for i := range b {
 		b[i] = 0

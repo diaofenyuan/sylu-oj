@@ -168,6 +168,16 @@ public class PracticeCatalogService {
                 .map(Problem::getDifficulty).orElse("EASY");
     }
 
+    /** 自测运行所需的题目判题配置（与提交判题使用同一快照 judge_config）。 */
+    public String judgeConfigFor(Long studentId, Long problemId) {
+        Catalog catalog = ensureCatalog(studentId);
+        return catalog.snapshots().stream()
+                .filter(snapshot -> snapshot.getProblemId().equals(problemId))
+                .findFirst()
+                .map(ProblemSnapshot::getJudgeConfig)
+                .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "刷题题目不存在"));
+    }
+
     private record Catalog(AssignmentTarget target, List<ProblemSnapshot> snapshots) {
     }
 

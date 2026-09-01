@@ -101,6 +101,21 @@ func main() {
 			continue
 		}
 		if task == nil {
+			run, err := client.ClaimRunTask(25)
+			if err != nil {
+				log.Printf("WARN 领取自测运行任务失败: %v", err)
+				sleepCtx(ctx, 3*time.Second)
+				continue
+			}
+			if run == nil {
+				continue
+			}
+			result := judge.RunOnce(ctx, run)
+			if err := client.SubmitRunResult(result); err != nil {
+				log.Printf("WARN 自测运行结果回传失败 run=%s: %v", run.RunUuid, err)
+			} else {
+				log.Printf("INFO 自测运行完成 run=%s sandbox=%s", run.RunUuid, result.SandboxMode)
+			}
 			continue
 		}
 		submission, err := judge.JudgeTask(ctx, task)

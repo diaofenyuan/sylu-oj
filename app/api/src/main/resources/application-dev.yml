@@ -48,10 +48,9 @@ oj:
       mode: inline
     # 开发专用密钥，仅用于本地 H2/联调，不得用于生产
     crypto-key: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-    # 自测运行：本机直接编译执行（非沙盒），生产必须为 false
+    # 自测运行：与提交判题共用同一沙盒执行管线（Judge Gateway + Agent），生产必须为 false
     local-run:
       enabled: true
-      run-timeout-ms: 8000
 
 logging:
   level:

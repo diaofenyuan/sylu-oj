@@ -3,6 +3,8 @@ package oj.practice;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import oj.judge.JudgeRunService;
+import oj.judge.JudgeTaskService;
 import oj.shared.AccessGuard;
 import oj.shared.ApiException;
 import oj.shared.ErrorCode;
@@ -21,7 +23,9 @@ import java.util.Map;
 
 /**
  * 学生刷题接口：查询与自测运行。正式提交仍通过 StudentController 进入统一判题沙盒。
- * 自测运行（local-run）仅在开发/内测配置启用，不落库、不占提交次数、不计分。
+ * 自测运行（local-run）仅在开发/内测配置启用：经 Judge Gateway 交给与提交
+ * 判题完全相同的沙盒执行管线（同一 sandbox Runner、同一 cgroup/wait4 资源测量口径），
+ * 不落库、不占提交次数、不计分。
  */
 @RestController
 @RequestMapping("/api/student/practice")
@@ -31,16 +35,16 @@ public class PracticeController {
     private static final int MAX_RUN_INPUT_BYTES = 65_536;
 
     private final PracticeCatalogService catalogService;
-    private final LocalCodeRunner localCodeRunner;
+    private final JudgeRunService judgeRunService;
     private final AccessGuard accessGuard;
     private final boolean localRunEnabled;
 
     public PracticeController(PracticeCatalogService catalogService,
-                              LocalCodeRunner localCodeRunner,
+                              JudgeRunService judgeRunService,
                               AccessGuard accessGuard,
                               @Value("${oj.judge.local-run.enabled:false}") boolean localRunEnabled) {
         this.catalogService = catalogService;
-        this.localCodeRunner = localCodeRunner;
+        this.judgeRunService = judgeRunService;
         this.accessGuard = accessGuard;
         this.localRunEnabled = localRunEnabled;
     }
@@ -78,14 +82,17 @@ public class PracticeController {
         if (!problem.languages().contains(request.language())) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "该题目不支持此语言");
         }
-        LocalCodeRunner.RunOutcome outcome =
-                localCodeRunner.run(request.language(), request.code(), input);
+        // 与提交判题同一沙盒：相同快照 judge_config、相同运行时、相同资源测量。
+        String judgeConfig = catalogService.judgeConfigFor(user.studentId(), request.problemId());
+        JudgeRunService.RunResultPayload outcome = judgeRunService.execute(
+                request.language(), JudgeTaskService.runtimeFor(request.language()),
+                judgeConfig, request.code(), input);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("output", outcome.output());
         result.put("stderr", outcome.stderr());
         result.put("compileError", outcome.compileError());
         result.put("exitCode", outcome.exitCode());
-        result.put("timeUs", outcome.timeUs());
+        result.put("timeUs", outcome.totalTimeMs() * 1000);
         result.put("peakMemoryKb", outcome.peakMemoryKb());
         result.put("timedOut", outcome.timedOut());
         if (outcome.compileError() != null && !outcome.compileError().isBlank()) {

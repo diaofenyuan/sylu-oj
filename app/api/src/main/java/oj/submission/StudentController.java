@@ -8,7 +8,8 @@ import oj.assignment.Assignment;
 import oj.assignment.AssignmentService;
 import oj.assignment.AssignmentTarget;
 import oj.assignment.ProblemSnapshot;
-import oj.practice.LocalCodeRunner;
+import oj.judge.JudgeRunService;
+import oj.judge.JudgeTaskService;
 import oj.problem.ProblemService;
 import oj.problem.Testcase;
 import oj.shared.AccessGuard;
@@ -50,7 +51,7 @@ public class StudentController {
     private final oj.classroom.ClassroomService classroomService;
     private final oj.submission.SubmissionCounterRepository counterRepository;
     private final JudgeResultRepository judgeResultRepository;
-    private final LocalCodeRunner localCodeRunner;
+    private final JudgeRunService judgeRunService;
     private final AccessGuard accessGuard;
     private final boolean localRunEnabled;
     private final Clock clock;
@@ -62,7 +63,7 @@ public class StudentController {
                              oj.classroom.ClassroomService classroomService,
                              oj.submission.SubmissionCounterRepository counterRepository,
                              JudgeResultRepository judgeResultRepository,
-                             LocalCodeRunner localCodeRunner,
+                             JudgeRunService judgeRunService,
                              AccessGuard accessGuard,
                              @Value("${oj.judge.local-run.enabled:false}") boolean localRunEnabled,
                              Clock clock) {
@@ -171,13 +172,16 @@ public class StudentController {
         if (input.getBytes(StandardCharsets.UTF_8).length > MAX_RUN_INPUT_BYTES) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "自测输入超过长度限制");
         }
-        LocalCodeRunner.RunOutcome outcome = localCodeRunner.run(request.language(), request.code(), input);
+        // 与提交判题同一沙盒：同一快照 judge_config、同一运行时、同一资源测量口径。
+        JudgeRunService.RunResultPayload outcome = judgeRunService.execute(
+                request.language(), JudgeTaskService.runtimeFor(request.language()),
+                snapshot.getJudgeConfig(), request.code(), input);
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("output", outcome.output());
         result.put("stderr", outcome.stderr());
         result.put("compileError", outcome.compileError());
         result.put("exitCode", outcome.exitCode());
-        result.put("timeUs", outcome.timeUs());
+        result.put("timeUs", outcome.totalTimeMs() * 1000);
         result.put("peakMemoryKb", outcome.peakMemoryKb());
         result.put("timedOut", outcome.timedOut());
         if (outcome.compileError() != null && !outcome.compileError().isBlank()) {
