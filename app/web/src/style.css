@@ -94,9 +94,39 @@ button {
   font-family: inherit;
   transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease, transform 0.05s ease;
   box-shadow: 0 1px 2px rgba(37, 99, 235, 0.25);
+  position: relative;
+  overflow: hidden;
 }
-button:hover:not(:disabled) { background: var(--accent-strong); box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28); }
-button:active:not(:disabled) { transform: translateY(1px); }
+
+/* 波纹效果 */
+button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.3);
+  transform: translate(-50%, -50%);
+  transition: width 0.6s, height 0.6s;
+}
+
+button:active:not(:disabled)::before {
+  width: 300px;
+  height: 300px;
+}
+
+button:hover:not(:disabled) { 
+  background: var(--accent-strong); 
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.28);
+  transform: translateY(-1px);
+}
+
+button:active:not(:disabled) { 
+  transform: translateY(1px); 
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.2);
+}
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 button:focus-visible, a:focus-visible { outline: 3px solid rgba(37, 99, 235, 0.35); outline-offset: 1px; }
 
@@ -140,6 +170,12 @@ select { cursor: pointer; }
   padding: 20px 22px;
   margin-bottom: 16px;
   box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 table {
@@ -162,8 +198,17 @@ th {
   background: var(--panel-2);
 }
 tbody tr:last-child td { border-bottom: none; }
-tbody tr { transition: background 0.12s ease; }
-tbody tr:hover { background: #fafbfe; }
+tbody tr { 
+  transition: background 0.12s ease, transform 0.12s ease; 
+}
+tbody tr:hover { 
+  background: #fafbfe;
+  transform: scale(1.01);
+}
+
+.dark tbody tr:hover {
+  background: var(--panel-2);
+}
 
 .muted { color: var(--muted); }
 .row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
@@ -245,7 +290,130 @@ tbody tr:hover { background: #fafbfe; }
 
 .err { color: var(--danger); }
 
+/* 响应式布局优化 */
+@media (max-width: 1024px) {
+  body {
+    font-size: 13px;
+  }
+  
+  .card {
+    padding: 16px 18px;
+  }
+  
+  button {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+}
+
+@media (max-width: 768px) {
+  h2 { font-size: 20px; }
+  h3 { font-size: 15px; }
+  
+  .card { 
+    padding: 14px 16px;
+    margin-bottom: 12px;
+  }
+  
+  table {
+    font-size: 13px;
+  }
+  
+  th, td {
+    padding: 8px 10px;
+  }
+  
+  button {
+    padding: 7px 12px;
+    font-size: 13px;
+  }
+  
+  .row {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
 @media (max-width: 640px) {
-  .card { padding: 16px; }
-  h2 { font-size: 19px; }
+  body {
+    font-size: 12px;
+  }
+  
+  .card { padding: 12px 14px; }
+  h2 { font-size: 18px; }
+  h3 { font-size: 14px; }
+  
+  button {
+    padding: 6px 10px;
+    font-size: 12px;
+    gap: 4px;
+  }
+  
+  table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .chip {
+    font-size: 11px;
+    padding: 2px 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  body {
+    font-size: 12px;
+  }
+  
+  .card {
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  
+  button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .row {
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  .row button {
+    width: 100%;
+  }
+}
+
+/* 加载骨架屏动画 */
+@keyframes skeleton-loading {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: calc(200px + 100%) 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, var(--panel-2) 0px, var(--bg) 40px, var(--panel-2) 80px);
+  background-size: 200px 100%;
+  animation: skeleton-loading 1.2s ease-in-out infinite;
+}
+
+/* 平滑滚动 */
+* {
+  scroll-behavior: smooth;
+}
+
+/* 选中文本样式 */
+::selection {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+}
+
+.dark ::selection {
+  background: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
 }
