@@ -22,6 +22,9 @@
         <router-link to="/teacher/assignments">作业管理</router-link>
       </nav>
       <div class="spacer"></div>
+      <button class="theme-toggle" @click="toggleTheme" :title="themeTitle">
+        <Icon :icon="themeIcon" />
+      </button>
       <button v-if="authed" class="secondary" @click="logout">退出登录</button>
     </header>
     <main :class="{ full: isLogin, workbench: isWorkbench }"><router-view /></main>
@@ -29,13 +32,15 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { getToken } from './api'
 import { getRole, clearSession } from './auth'
+import { useTheme } from './composables/useTheme'
 
 const router = useRouter()
 const route = useRoute()
+const { theme, toggleTheme, applyTheme } = useTheme()
 
 const isLogin = computed(() => route.path === '/login' || route.path === '/')
 const isWorkbench = computed(() =>
@@ -47,6 +52,18 @@ const role = computed(() => {
 })
 const authed = computed(() => !!getToken() && !isLogin.value)
 
+const themeIcon = computed(() => {
+  if (theme.value === 'dark') return 'mdi:weather-night'
+  if (theme.value === 'light') return 'mdi:weather-sunny'
+  return 'mdi:theme-light-dark'
+})
+
+const themeTitle = computed(() => {
+  if (theme.value === 'dark') return '暗黑模式'
+  if (theme.value === 'light') return '明亮模式'
+  return '跟随系统'
+})
+
 function homeFor(r) {
   if (r === 'STUDENT') return '/student'
   if (r === 'ADMIN') return '/admin'
@@ -57,6 +74,10 @@ function logout() {
   clearSession()
   router.push('/login')
 }
+
+onMounted(() => {
+  applyTheme()
+})
 </script>
 
 <style scoped>
@@ -74,6 +95,10 @@ function logout() {
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
+}
+
+.dark .topbar {
+  background: rgba(19, 24, 38, 0.86);
 }
 
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); }
@@ -95,7 +120,7 @@ function logout() {
 .brand-tag {
   font-size: 12px;
   color: var(--muted);
-  background: #f1f5f9;
+  background: var(--panel-2);
   border: 1px solid var(--border);
   padding: 1px 9px;
   border-radius: 999px;
@@ -111,6 +136,24 @@ nav a {
 }
 nav a:hover { color: var(--text); background: var(--panel-2); }
 nav a.router-link-active { color: var(--accent); background: var(--accent-soft); }
+
+.theme-toggle {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  transition: all 0.15s ease;
+}
+.theme-toggle:hover {
+  background: var(--panel);
+  color: var(--accent);
+  border-color: var(--border-strong);
+}
 
 main {
   padding: 28px clamp(20px, 4vw, 48px) 40px;

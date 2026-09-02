@@ -21,6 +21,36 @@
   --radius: 12px;
 }
 
+/* 暗黑模式 */
+.dark {
+  --bg: #0a0e1a;
+  --panel: #131826;
+  --panel-2: #1a2030;
+  --border: #2a3347;
+  --border-strong: #3a4458;
+  --text: #e8edf4;
+  --muted: #94a3b8;
+  --accent: #3b82f6;
+  --accent-strong: #60a5fa;
+  --accent-soft: #1e3a5f;
+  --danger: #ef4444;
+  --danger-soft: #3a1a1a;
+  --ok: #10b981;
+  --ok-soft: #1a3a2f;
+  --warn: #f59e0b;
+  --warn-soft: #3a2f1a;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 6px 24px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 24px 60px rgba(0, 0, 0, 0.5);
+}
+
+.dark body {
+  background:
+    radial-gradient(1100px 520px at 88% -12%, rgba(59, 130, 246, 0.08), transparent 60%),
+    radial-gradient(900px 480px at -8% 40%, rgba(14, 165, 233, 0.06), transparent 55%),
+    var(--bg);
+}
+
 * { box-sizing: border-box; }
 
 html, body { height: 100%; }
