@@ -268,11 +268,24 @@ func (j *Judge) RunOnce(ctx context.Context, task *RunTask) *RunResult {
 				SandboxMode: j.sandboxMode}
 		}
 		productFiles = compileRes.Files
+		if j.debug {
+			log.Printf("DEBUG run-once compile run=%s exit=%d peak=%dKB wall=%dms files=%d",
+				task.RunUuid, compileRes.ExitCode, compileRes.PeakMemoryKb,
+				compileRes.WallTimeMs, len(compileRes.Files))
+		}
 	}
 
 	files := map[string][]byte{}
 	for name, content := range productFiles {
 		files[name] = content
+	}
+	if j.debug {
+		names := make([]string, 0, len(files))
+		for name, content := range files {
+			names = append(names, fmt.Sprintf("%s(%dB)", name, len(content)))
+		}
+		log.Printf("DEBUG run-once files run=%s argv=%v stdin=%dB files=%v",
+			task.RunUuid, lang.Run.Argv, len(task.Input), names)
 	}
 	runRes, err := j.runner.Execute(ctx, sandbox.ExecSpec{
 		Image:   image,
@@ -284,6 +297,10 @@ func (j *Judge) RunOnce(ctx context.Context, task *RunTask) *RunResult {
 	if err != nil {
 		return &RunResult{RunUuid: task.RunUuid, CompileError: "运行沙箱执行失败: " + err.Error(),
 			SandboxMode: j.sandboxMode}
+	}
+	if j.debug {
+		log.Printf("DEBUG run-once run=%s exit=%d timedOut=%v peak=%dKB wall=%dms",
+			task.RunUuid, runRes.ExitCode, runRes.TimedOut, runRes.PeakMemoryKb, runRes.WallTimeMs)
 	}
 	return &RunResult{
 		RunUuid:      task.RunUuid,
