@@ -146,6 +146,7 @@ tbody tr:hover { background: #fafbfe; }
 .chip {
   display: inline-flex;
   align-items: center;
+  gap: 4px;
   font-size: 12px;
   font-weight: 600;
   padding: 3px 10px;
@@ -157,6 +158,51 @@ tbody tr:hover { background: #fafbfe; }
 .chip-warn { background: var(--warn-soft); color: var(--warn); }
 .chip-bad { background: var(--danger-soft); color: var(--danger); }
 .chip-muted { background: #f1f5f9; color: var(--muted); }
+
+/* 判题状态动画 */
+.chip-ac {
+  background: var(--ok-soft);
+  color: var(--ok);
+  animation: pulse-success 1.5s ease-in-out;
+}
+.chip-wa, .chip-pe {
+  background: var(--danger-soft);
+  color: var(--danger);
+  animation: shake 0.5s ease-in-out;
+}
+.chip-tle, .chip-mle, .chip-ole {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+.chip-ce, .chip-re, .chip-bsc, .chip-se {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+.chip-pd {
+  background: var(--accent-soft);
+  color: var(--accent);
+  animation: spin-icon 1s linear infinite;
+}
+
+@keyframes pulse-success {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); box-shadow: 0 0 0 4px rgba(5, 150, 105, 0.2); }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+@keyframes spin-icon {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin-icon {
+  animation: spin-icon 1s linear infinite;
+}
 
 .empty {
   background: var(--panel);

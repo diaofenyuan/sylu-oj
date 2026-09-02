@@ -2,10 +2,16 @@
   <div class="oj-workbench">
     <!-- 顶部工具条 -->
     <div class="wb-topbar">
-      <button class="tb-btn" @click="drawer = true">☰ 题目列表</button>
+      <button class="tb-btn" @click="drawer = true">
+        <Icon icon="mdi:format-list-bulleted" />
+        题目列表
+      </button>
       <div class="tb-title">
         <strong>{{ selected ? displayCode(selected) + ' ' + selected.title : title || (isAssignment ? '作业题目' : '刷题中心') }}</strong>
-        <span v-if="selected" class="chip" :class="stateClass(selected.status)">{{ stateText(selected.status) }}</span>
+        <span v-if="selected" class="chip" :class="stateClass(selected.status)">
+          <Icon :icon="getStatusIcon(selected.status)" />
+          {{ stateText(selected.status) }}
+        </span>
       </div>
       <div class="tb-nav">
         <button class="tb-btn" :disabled="!hasPrev" @click="step(-1)">‹ 上一题</button>
@@ -79,7 +85,10 @@
           </select>
           <span class="mode-tag">ACM 模式 · stdin/stdout</span>
           <span class="spacer"></span>
-          <button class="tb-btn" @click="resetCode">重置代码</button>
+          <button class="tb-btn" @click="resetCode">
+            <Icon icon="mdi:refresh" />
+            重置代码
+          </button>
         </div>
 
         <div class="cm-wrap">
@@ -97,10 +106,12 @@
             <span class="spacer"></span>
             <button class="mini-btn" @click="panelOpen = !panelOpen">{{ panelOpen ? '▾ 收起' : '▴ 展开' }}</button>
             <button class="run-btn" :disabled="running || !selected || !canSubmitNow" @click="runFromButton">
+              <Icon :icon="running ? 'mdi:loading' : 'mdi:play'" :class="{ 'spin-icon': running }" />
               {{ running ? '运行中…' : '自测运行' }}
             </button>
             <button class="submit-btn"
                     :disabled="submitting || !selected || !code.trim() || !canSubmitNow" @click="submit">
+              <Icon :icon="submitting ? 'mdi:loading' : 'mdi:send'" :class="{ 'spin-icon': submitting }" />
               {{ submitting ? '提交中…' : canSubmitNow ? '保存并提交' : '窗口未开放' }}
             </button>
           </div>
@@ -110,11 +121,14 @@
             <template v-if="panel === 'result'">
               <div v-if="resultPhase === 'idle'" class="rp-idle">保存并提交之后,这里将会显示运行结果</div>
               <div v-else-if="resultPhase === 'pending'" class="rp-pending">
-                <span class="spin"></span> 代码已送入安全沙盒,正在评测隐藏用例…
+                <Icon icon="mdi:loading" class="spin-icon" /> 代码已送入安全沙盒,正在评测隐藏用例…
               </div>
               <template v-else>
                 <div class="result-line">
-                  <span class="chip" :class="stateClass(latestResult.status)">{{ stateText(latestResult.status) }}</span>
+                  <span class="chip" :class="stateClass(latestResult.status)">
+                    <Icon :icon="getStatusIcon(latestResult.status)" />
+                    {{ stateText(latestResult.status) }}
+                  </span>
                   <span v-if="latestResult.score !== null" class="result-score">得分 <strong>{{ latestResult.score }}</strong>/100</span>
                   <span v-if="latestResult.timeMs !== null" class="muted">运行时间:{{ latestResult.timeMs }}ms</span>
                 </div>
@@ -156,7 +170,12 @@
                 <tbody>
                   <tr v-for="s in submissions" :key="s.submissionId">
                     <td>{{ s.attemptNo }}</td>
-                    <td><span class="chip" :class="stateClass(s.judgeStatus)">{{ stateText(s.judgeStatus) }}</span></td>
+                    <td>
+                      <span class="chip" :class="stateClass(s.judgeStatus)">
+                        <Icon :icon="getStatusIcon(s.judgeStatus)" />
+                        {{ stateText(s.judgeStatus) }}
+                      </span>
+                    </td>
                     <td>{{ s.normalizedScore ?? '—' }}</td>
                     <td>{{ langName(s.language) }}</td>
                     <td>{{ s.totalTimeMs != null ? s.totalTimeMs + 'ms' : '—' }}</td>
@@ -205,7 +224,10 @@
                   @click="selectProblem(problem.problemId); drawer = false">
             <span class="problem-no">{{ displayCode(problem) }}</span>
             <span class="problem-title">{{ problem.title }}</span>
-            <span class="problem-state" :class="stateClass(problem.status)">{{ stateText(problem.status) }}</span>
+            <span class="problem-state chip" :class="stateClass(problem.status)">
+              <Icon :icon="getStatusIcon(problem.status)" />
+              {{ stateText(problem.status) }}
+            </span>
           </button>
           <div v-if="!filteredProblems.length" class="rp-idle">没有匹配的题目</div>
         </div>
@@ -219,6 +241,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
+import { useJudgeStatus } from '../composables/useJudgeStatus'
 
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection
@@ -231,6 +254,8 @@ import { tags } from '@lezer/highlight'
 import { cpp } from '@codemirror/lang-cpp'
 import { python } from '@codemirror/lang-python'
 import { java } from '@codemirror/lang-java'
+
+const { getStatusIcon, getStatusText, getStatusClass } = useJudgeStatus()
 
 const props = defineProps({
   mode: { type: String, default: 'practice' },
@@ -382,8 +407,9 @@ function winClass(w) { return ({ NOT_STARTED: 'chip-warn', OPEN: 'chip-ok', CLOS
 function diffChipClass(key) { return ({ EASY: 'chip-ok', BASIC: 'chip-primary', INTERMEDIATE: 'chip-warn', HARD: 'chip-bad' })[key] || 'chip-muted' }
 function levelCount(key) { return problems.value.filter(problem => problem.difficulty === key).length }
 function levelPassed(key) { return problems.value.filter(problem => problem.difficulty === key && problem.status === 'AC').length }
-function stateText(status) { return ({ AC: '已通过', PD: '评测中', UNATTEMPTED: '未开始', WA: '答案错误', CE: '编译错误', TLE: '超时', MLE: '内存超限', OLE: '输出超限', PE: '格式错误', RE: '运行错误', SE: '评测服务异常', BSC: '沙盒拦截' })[status] || status }
-function stateClass(status) { return ({ AC: 'chip-ok', PD: 'chip-warn', UNATTEMPTED: 'chip-muted', WA: 'chip-bad', CE: 'chip-bad', TLE: 'chip-bad', MLE: 'chip-bad', OLE: 'chip-bad', PE: 'chip-bad', RE: 'chip-bad', SE: 'chip-bad', BSC: 'chip-bad' })[status] || 'chip-muted' }
+// 使用新的状态工具函数
+function stateText(status) { return getStatusText(status) }
+function stateClass(status) { return getStatusClass(status) }
 function langName(value) { return ({ C: 'C', CPP: 'C++', PYTHON: 'Python', JAVA: 'Java' })[value] || value }
 function draftKey(id, lang) { return `oj-practice-draft-${id}-${lang || ''}` }
 function loadCodeFor(problemId, lang) {
