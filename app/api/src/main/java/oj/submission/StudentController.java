@@ -52,6 +52,7 @@ public class StudentController {
     private final oj.classroom.ClassroomService classroomService;
     private final oj.submission.SubmissionCounterRepository counterRepository;
     private final JudgeResultRepository judgeResultRepository;
+    private final JudgeResultService judgeResultService;
     private final JudgeRunService judgeRunService;
     private final LeaderboardService leaderboardService;
     private final AccessGuard accessGuard;
@@ -65,6 +66,7 @@ public class StudentController {
                              oj.classroom.ClassroomService classroomService,
                              oj.submission.SubmissionCounterRepository counterRepository,
                              JudgeResultRepository judgeResultRepository,
+                             JudgeResultService judgeResultService,
                              JudgeRunService judgeRunService,
                              LeaderboardService leaderboardService,
                              AccessGuard accessGuard,
@@ -77,6 +79,7 @@ public class StudentController {
         this.classroomService = classroomService;
         this.counterRepository = counterRepository;
         this.judgeResultRepository = judgeResultRepository;
+        this.judgeResultService = judgeResultService;
         this.judgeRunService = judgeRunService;
         this.leaderboardService = leaderboardService;
         this.accessGuard = accessGuard;
@@ -259,5 +262,30 @@ public class StudentController {
             @RequestParam(defaultValue = "50") int limit) {
         accessGuard.requireStudent();
         return leaderboardService.getLeaderboard(problemId, limit);
+    }
+
+    /**
+     * 我自己某次提交的测试点详情（状态/得分/耗时/内存）。
+     * 仅允许提交者本人查看，且提交必须属于该学生可访问的作业目标。
+     */
+    @GetMapping("/submissions/{submissionId}/testcases")
+    public List<Map<String, Object>> submissionTestcases(@PathVariable Long submissionId) {
+        var user = accessGuard.requireStudent();
+        Submission submission = submissionService.requireSubmission(submissionId);
+        if (!user.studentId().equals(submission.getStudentId())) {
+            throw new ApiException(ErrorCode.FORBIDDEN, "无权查看该提交的测试点详情");
+        }
+        var judgeResult = judgeResultService.requireResult(submissionId);
+        List<Map<String, Object>> result = new ArrayList<>();
+        for (TestcaseResult tcr : judgeResultService.testcaseResults(judgeResult.getId())) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("order", tcr.getTestcaseOrder());
+            item.put("status", tcr.getStatus());
+            item.put("score", tcr.getScore());
+            item.put("timeMs", tcr.getTimeMs());
+            item.put("memoryKb", tcr.getMemoryKb());
+            result.add(item);
+        }
+        return result;
     }
 }

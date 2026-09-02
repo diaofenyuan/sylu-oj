@@ -1,8 +1,17 @@
 <template>
   <div>
     <div class="page-head">
-      <h2>我的作业</h2>
-      <p class="muted">所属班级已发布的作业与考试</p>
+      <div>
+        <h2>我的作业</h2>
+        <p class="muted">所属班级已发布的作业与考试</p>
+      </div>
+      <div class="spacer"></div>
+      <router-link to="/student/contest/1">
+        <button class="secondary contest-entry">
+          <Icon icon="mdi:sword-cross" />
+          比赛模式
+        </button>
+      </router-link>
     </div>
 
     <div class="card asg-card" v-for="a in assignments" :key="a.targetId">
@@ -67,4 +76,6 @@ onMounted(async () => {
 .asg-info .muted { font-size: 13px; }
 .asg-meta { display: flex; align-items: center; gap: 16px; }
 .attempts { font-size: 13px; }
+.page-head { display: flex; align-items: center; gap: 12px; }
+.contest-entry { display: inline-flex; align-items: center; gap: 6px; }
 </style>

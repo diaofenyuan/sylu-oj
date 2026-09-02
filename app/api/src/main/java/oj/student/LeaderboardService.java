@@ -92,7 +92,7 @@ public class LeaderboardService {
                 submission.getLanguage(),
                 result.getTotalTimeMs(),
                 result.getPeakMemoryKb(),
-                submission.getSubmittedAt().toString()
+                submission.getCreatedAt().toString()
         );
     }
 

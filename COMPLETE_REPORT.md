@@ -24,7 +24,7 @@
 ### 一、判题系统性能测量优化 ✅
 
 #### 1.1 测试点性能详情展示
-**文件**：`app/web/src/components/TestCaseDetails.vue`
+**文件**：`app/web/src/components/CaseDetails.vue`（测试点详情，接线于 ProblemWorkbench 执行结果面板）
 
 **功能亮点**：
 - 📊 每个测试点的耗时柱状图可视化
@@ -41,7 +41,7 @@ width: (case.timeMs / maxTime * 100) + '%'
 ```
 
 #### 1.2 性能排行榜
-**后端API**：`judge/api/src/main/java/ai/sylu/judge/api/controller/StudentProblemController.java`
+**后端API**：`app/api/src/main/java/oj/submission/StudentController.java` + `app/api/src/main/java/oj/student/LeaderboardService.java`
 ```java
 @GetMapping("/problems/{problemId}/leaderboard")
 public ResponseEntity<Map<String, List<LeaderboardEntry>>> getLeaderboard(
@@ -50,7 +50,7 @@ public ResponseEntity<Map<String, List<LeaderboardEntry>>> getLeaderboard(
 )
 ```
 
-**前端组件**：`app/web/src/components/PerformanceLeaderboard.vue`
+**前端组件**：`app/web/src/components/Leaderboard.vue`
 
 **功能亮点**：
 - 🏆 前3名金银铜牌特殊徽章
@@ -60,7 +60,7 @@ public ResponseEntity<Map<String, List<LeaderboardEntry>>> getLeaderboard(
 - 🔒 不展示具体代码（防抄袭）
 
 #### 1.3 错误诊断助手
-**文件**：`app/web/src/components/ErrorDiagnostic.vue`
+**文件**：`app/web/src/components/ErrorDiagnostics.vue`
 
 **智能诊断6种错误类型**：
 - **AC**：✅ 通过（绿色脉动动画）
@@ -75,7 +75,7 @@ public ResponseEntity<Map<String, List<LeaderboardEntry>>> getLeaderboard(
 ### 二、用户体验优化 ✅
 
 #### 2.1 代码模板功能
-**文件**：`app/web/src/components/CodeTemplates.vue`
+**文件**：`app/web/src/components/TemplatePicker.vue` + `app/web/src/composables/useCodeTemplates.js`
 
 **提供4种语言 + 30种算法模板**：
 
@@ -106,7 +106,7 @@ insertTemplate(template) {
 ```
 
 #### 2.2 快捷键帮助面板
-**文件**：`app/web/src/components/KeyboardShortcuts.vue`
+**文件**：`app/web/src/components/ShortcutHelp.vue`
 
 **快捷键列表**：
 | 快捷键 | 功能 |
@@ -424,41 +424,43 @@ button:hover {
 
 ## 📦 文件清单
 
-### 新增Vue组件（13个）
+### 新增Vue组件（11个）+ 复用视图（2个）
 ```
 app/web/src/components/
-├── TestCaseDetails.vue          # 测试点详情
-├── ErrorDiagnostic.vue          # 错误诊断
-├── PerformanceLeaderboard.vue   # 性能排行榜
-├── CodeTemplates.vue            # 代码模板
-├── KeyboardShortcuts.vue        # 快捷键帮助
-├── SampleComparison.vue         # 样例对比
-├── DifficultyBadge.vue          # 难度徽章
-├── AssignmentProgress.vue       # 作业进度
-├── DiscussionZone.vue           # 讨论区
-└── ContestMode.vue              # 比赛模式
+├── CaseDetails.vue                # 测试点详情（时间/内存柱状图）
+├── ErrorDiagnostics.vue           # 智能错误诊断
+├── Leaderboard.vue                # 性能排行榜（金银铜牌）
+├── TemplatePicker.vue             # 代码模板选择器
+├── ShortcutHelp.vue               # 快捷键帮助（Ctrl+/）
+├── SampleCompare.vue              # 样例对比（字符级差异高亮）
+├── DifficultyBadge.vue            # 难度徽章
+├── ProgressCard.vue               # 作业进度（SVG圆环+倒计时）
+├── DiscussionZone.vue             # 题目讨论区（Markdown+点赞回复）
+├── ContestMode.vue                # 比赛模式（ACM规则+封榜）
+└── ProblemWorkbench.vue           # 刷题/作业工作台（组件接线中枢）
 
 app/web/src/views/teacher/
-└── AnalyticsEnhanced.vue        # 教师数据分析增强
+└── AnalyticsEnhanced.vue          # 教师数据分析增强（路由 /teacher/analytics/:targetId）
 
 app/web/src/composables/
-├── useTheme.js                  # 主题切换
-└── useRipple.js                 # 波纹效果
+├── useTheme.js                    # 主题切换（亮/暗/自动）
+├── useJudgeStatus.js              # 判题状态图标/文案
+└── useCodeTemplates.js            # 代码模板数据（4语言×模板/片段）
 ```
 
 ### 后端API（2个）
 ```
-judge/api/src/main/java/ai/sylu/judge/api/
-├── controller/
-│   └── StudentProblemController.java  # 性能排行榜API
-└── service/
-    └── JudgeResultService.java        # 判题结果服务
+app/api/src/main/java/oj/
+├── submission/StudentController.java
+│   ├── GET /api/student/problems/{problemId}/leaderboard      # 性能排行榜
+│   └── GET /api/student/submissions/{id}/testcases            # 测试点详情（本人提交）
+└── student/LeaderboardService.java                             # 排行榜聚合服务
 ```
 
 ### 数据库迁移（1个）
 ```
-judge/api/src/main/resources/db/migration/
-└── V1_2__add_case_details_to_judge_result.sql
+app/api/src/main/resources/db/migration/
+└── V007__judge_result_case_details.sql
 ```
 
 ### 文档（3份）

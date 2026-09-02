@@ -6,9 +6,11 @@ import TeacherProblemBank from './views/teacher/ProblemBank.vue'
 import TeacherAssignmentEditor from './views/teacher/AssignmentEditor.vue'
 import TeacherAssignmentsManage from './views/teacher/AssignmentsManage.vue'
 import TeacherAnalytics from './views/teacher/Analytics.vue'
+import TeacherAnalyticsEnhanced from './views/teacher/AnalyticsEnhanced.vue'
 import StudentHome from './views/student/StudentHome.vue'
 import StudentAssignment from './views/student/StudentAssignment.vue'
 import StudentPractice from './views/student/StudentPractice.vue'
+import ContestMode from './components/ContestMode.vue'
 import { getRole, refreshRole } from './auth'
 import { getToken } from './api'
 
@@ -24,10 +26,12 @@ const router = createRouter({
     { path: '/teacher/classes/:classId/problems', component: TeacherProblemBank, meta: { area: 'teacher' } },
     { path: '/teacher/assignment', component: TeacherAssignmentEditor, meta: { area: 'teacher' } },
     { path: '/teacher/assignments', component: TeacherAssignmentsManage, meta: { area: 'teacher' } },
-    { path: '/teacher/analytics/:targetId', component: TeacherAnalytics, meta: { area: 'teacher' } },
+    { path: '/teacher/analytics/:targetId', component: TeacherAnalyticsEnhanced, meta: { area: 'teacher' } },
+    { path: '/teacher/analytics/:targetId/classic', component: TeacherAnalytics, meta: { area: 'teacher' } },
     { path: '/student', component: StudentHome, meta: { area: 'student' } },
     { path: '/student/practice', component: StudentPractice, meta: { area: 'student' } },
-    { path: '/student/targets/:targetId', component: StudentAssignment, meta: { area: 'student' } }
+    { path: '/student/targets/:targetId', component: StudentAssignment, meta: { area: 'student' } },
+    { path: '/student/contest/:contestId', component: ContestMode, props: route => ({ contestId: Number(route.params.contestId) }), meta: { area: 'student' } }
   ]
 })
 

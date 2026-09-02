@@ -45,7 +45,8 @@ public class InternalJudgeController {
                 request.testcases() == null ? null : request.testcases().stream()
                         .map(t -> new JudgeResultService.TestcaseOutcome(t.order(), t.status(),
                                 t.score(), t.timeMs(), t.memoryKb()))
-                        .toList()));
+                        .toList(),
+                null));
         return Map.of("judgeResultId", result.getId(),
                 "resultCode", result.getResultCode(),
                 "resultVersion", result.getResultVersion());

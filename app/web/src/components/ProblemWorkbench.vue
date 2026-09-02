@@ -44,7 +44,7 @@
               <h3>{{ selected.title }}</h3>
             </div>
             <div class="pr-meta">
-              <span v-if="selected.difficulty" class="chip" :class="diffChipClass(selected.difficulty)">{{ difficultyLabel(selected.difficulty) }}</span>
+              <DifficultyBadge v-if="selected.difficulty" :difficulty="selected.difficulty" />
               <span class="meta-item">时间限制:{{ Math.round(selected.timeLimitMs / 1000) }}s</span>
               <span class="meta-item">空间限制:{{ selected.memoryLimitMb }}M</span>
               <span class="meta-item">最佳:{{ selected.bestScore }} 分</span>
@@ -85,6 +85,18 @@
           </select>
           <span class="mode-tag">ACM 模式 · stdin/stdout</span>
           <span class="spacer"></span>
+          <button class="tb-btn" @click="showTemplates = true">
+            <Icon icon="mdi:code-braces" />
+            模板
+          </button>
+          <button class="tb-btn" @click="showLeaderboard = true">
+            <Icon icon="mdi:trophy" />
+            排行榜
+          </button>
+          <button class="tb-btn" @click="showShortcuts = true">
+            <Icon icon="mdi:keyboard" />
+            快捷键
+          </button>
           <button class="tb-btn" @click="resetCode">
             <Icon icon="mdi:refresh" />
             重置代码
@@ -135,6 +147,13 @@
                 <p v-if="latestResult.score !== null && latestResult.score < 100" class="muted result-hint">
                   未全部通过:可通过左侧样例对照输出,或用「自测运行」调试代码
                 </p>
+                <CaseDetails v-if="caseDetails.length" :case-details="caseDetails" />
+                <ErrorDiagnostics
+                  :status="latestResult.status"
+                  :time-limit="selected?.timeLimitMs"
+                  :memory-limit="selected?.memoryLimitMb"
+                  :actual-time="latestResult.timeMs"
+                />
               </template>
             </template>
 
@@ -161,6 +180,26 @@
               <p v-if="selfTestResult?.compileError" class="st-err mono">{{ selfTestResult.compileError }}</p>
               <p v-else-if="selfTestResult?.stderr" class="st-err mono">{{ selfTestResult.stderr }}</p>
               <p v-if="selfTestResult?.timedOut" class="st-err">运行超时,请检查是否有死循环或阻塞输入</p>
+              <SampleCompare
+                v-if="showSampleCompare"
+                visible
+                :input="selfTestInput"
+                :expected="matchedSample.expectedOutput"
+                :actual="selfTestResult.output || ''"
+                :time-ms="selfTestTimeMs"
+                :memory-kb="selfTestResult.peakMemoryKb"
+              />
+            </template>
+
+            <!-- 题目讨论区 -->
+            <template v-else-if="panel === 'discussion'">
+              <DiscussionZone
+                v-if="selected"
+                :problem-id="Number(selected.problemId)"
+                user-role="student"
+                :user-id="myUserId"
+              />
+              <div v-else class="rp-idle">先从题目列表选择一道题目</div>
             </template>
 
             <!-- 提交记录 -->
@@ -200,6 +239,18 @@
           <span class="muted">{{ passedCount }}/{{ problems.length }} 已通过</span>
           <button class="mini-btn" @click="drawer = false">✕</button>
         </div>
+        <div v-if="isAssignment && meta" class="drawer-progress">
+          <ProgressCard
+            title="作业进度"
+            :subtitle="title || ''"
+            :completed="passedCount"
+            :in-progress="attemptedCount"
+            :todo="todoCount"
+            :deadline="meta.deadline"
+            :size="72"
+            :stroke-width="8"
+          />
+        </div>
         <div v-if="!isAssignment" class="level-strip">
           <button v-for="level in levels" :key="level.key" class="level-tab"
                   :class="{ active: difficulty === level.key }" @click="difficulty = level.key">
@@ -234,6 +285,10 @@
       </div>
     </div>
 
+    <TemplatePicker :visible="showTemplates" :language="language" @close="showTemplates = false" @insert="insertTemplate" />
+    <ShortcutHelp :visible="showShortcuts" @close="showShortcuts = false" />
+    <Leaderboard :visible="showLeaderboard" :problem-id="selected?.problemId" @close="showLeaderboard = false" />
+
     <div v-if="tipText" class="copy-tip">{{ tipText }}</div>
   </div>
 </template>
@@ -242,6 +297,15 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { useJudgeStatus } from '../composables/useJudgeStatus'
+import CaseDetails from './CaseDetails.vue'
+import ErrorDiagnostics from './ErrorDiagnostics.vue'
+import SampleCompare from './SampleCompare.vue'
+import TemplatePicker from './TemplatePicker.vue'
+import ShortcutHelp from './ShortcutHelp.vue'
+import Leaderboard from './Leaderboard.vue'
+import DiscussionZone from './DiscussionZone.vue'
+import ProgressCard from './ProgressCard.vue'
+import DifficultyBadge from './DifficultyBadge.vue'
 
 import {
   EditorView, keymap, lineNumbers, highlightActiveLine, highlightActiveLineGutter, drawSelection
@@ -323,7 +387,8 @@ const levels = [
 const panels = [
   { key: 'result', label: '执行结果' },
   { key: 'selftest', label: '自测运行' },
-  { key: 'submissions', label: '提交记录' }
+  { key: 'submissions', label: '提交记录' },
+  { key: 'discussion', label: '讨论' }
 ]
 const langs = ['C', 'CPP', 'PYTHON', 'JAVA']
 const CODE_TEMPLATES = {
@@ -354,6 +419,11 @@ const selfTestInput = ref('')
 const selfTestResult = ref(null)
 const submissions = ref([])
 const leftWidth = ref(480)
+const showTemplates = ref(false)
+const showShortcuts = ref(false)
+const showLeaderboard = ref(false)
+const caseDetails = ref([])
+const myUserId = ref(0)
 
 const cmHost = ref(null)
 let editorView = null
@@ -391,6 +461,13 @@ const selfTestOutput = computed(() => {
 })
 const matchedSample = computed(() =>
   selected.value?.samples?.find(sample => normalize(sample.input) === normalize(selfTestInput.value)))
+const attemptedCount = computed(() =>
+  problems.value.filter(problem => problem.status !== 'UNATTEMPTED' && problem.status !== 'AC').length)
+const todoCount = computed(() => problems.value.filter(problem => problem.status === 'UNATTEMPTED').length)
+const selfTestTimeMs = computed(() =>
+  selfTestResult.value?.timeUs != null ? Math.max(0, Math.round(selfTestResult.value.timeUs / 1000)) : null)
+const showSampleCompare = computed(() =>
+  Boolean(selfTestResult.value && matchedSample.value && selfTestResult.value.phase === 'FINISHED'))
 
 function normalize(text) {
   return String(text ?? '').split('\n').map(line => line.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '')
@@ -535,6 +612,7 @@ async function selectProblem(problemId) {
   resultPhase.value = 'idle'
   latestResult.value = { status: null, score: null, timeMs: null }
   selfTestResult.value = null
+  caseDetails.value = []
   clearPoll()
   if (isAssignment.value) {
     selected.value = problems.value.find(problem => problem.problemId === problemId) || null
@@ -587,6 +665,8 @@ async function refreshSubmissionStatus() {
     resultPhase.value = 'done'
     panelOpen.value = true
   }
+  caseDetails.value = []
+  if (latest.judgeStatus !== 'PD') loadCaseDetails(latest.submissionId)
   selected.value.status = latest.judgeStatus
   if (latest.judgeStatus === 'AC') {
     selected.value.bestScore = 100
@@ -598,6 +678,32 @@ async function refreshSubmissionStatus() {
 
 function clearPoll() {
   if (pollTimer) { clearTimeout(pollTimer); pollTimer = null }
+}
+
+async function loadCaseDetails(submissionId) {
+  if (!submissionId) return
+  try {
+    caseDetails.value = await api(`/student/submissions/${submissionId}/testcases`)
+  } catch {
+    caseDetails.value = []
+  }
+}
+
+function insertTemplate(templateCode) {
+  code.value = templateCode
+  setEditorDoc(templateCode)
+  if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), templateCode)
+  flashTip('模板已插入编辑器')
+}
+
+async function ensureUserId() {
+  if (myUserId.value) return
+  try {
+    const profile = await api('/identity/me')
+    myUserId.value = profile.appUserId ?? 0
+  } catch {
+    myUserId.value = 0
+  }
 }
 
 async function submit() {
@@ -674,6 +780,7 @@ function resetCode() {
 
 function openPanel(key) {
   panelOpen.value = true
+  if (key === 'discussion') ensureUserId()
   if (panel.value === key && key !== 'selftest') return
   panel.value = key
   if (key === 'submissions') loadSubmissions()
@@ -711,14 +818,35 @@ function startDrag(event) {
 }
 
 function onKeydown(event) {
-  if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+  const mod = event.ctrlKey || event.metaKey
+  if (mod && event.key === 'Enter') {
     event.preventDefault()
     submit()
   }
-  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+  if (mod && event.key.toLowerCase() === 's') {
     event.preventDefault()
     if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
     flashTip('草稿已保存')
+  }
+  if (mod && event.altKey && event.key.toLowerCase() === 'r') {
+    event.preventDefault()
+    if (canSubmitNow.value || !isAssignment.value) runFromButton()
+  }
+  if (mod && event.altKey && event.key.toLowerCase() === 't') {
+    event.preventDefault()
+    showTemplates.value = true
+  }
+  if (mod && event.key === '/') {
+    event.preventDefault()
+    showShortcuts.value = !showShortcuts.value
+  }
+  if (mod && !event.altKey && event.key === '[') {
+    event.preventDefault()
+    step(-1)
+  }
+  if (mod && !event.altKey && event.key === ']') {
+    event.preventDefault()
+    step(1)
   }
 }
 
@@ -932,6 +1060,8 @@ onBeforeUnmount(() => {
 }
 @keyframes slide-in { from { transform: translateX(-30px); opacity: 0; } }
 .drawer-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.drawer-progress { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.drawer-progress :deep(.progress-card) { box-shadow: none; border: none; background: transparent; padding: 0; }
 .level-strip { display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap; }
 .level-tab { border: 1px solid var(--border); background: #fff; color: var(--muted); box-shadow: none; padding: 7px 11px; font-size: 12.5px; border-radius: 9px; }
 .level-tab:hover { box-shadow: none; background: var(--panel-2); }
