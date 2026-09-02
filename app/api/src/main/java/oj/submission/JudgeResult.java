@@ -47,6 +47,9 @@ public class JudgeResult {
     @Column(name = "result_version", nullable = false)
     private int resultVersion;
 
+    @Column(name = "case_details", columnDefinition = "JSON")
+    private String caseDetails;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -103,17 +106,26 @@ public class JudgeResult {
         return resultVersion;
     }
 
+    public String getCaseDetails() {
+        return caseDetails;
+    }
+
+    public void setCaseDetails(String caseDetails) {
+        this.caseDetails = caseDetails;
+    }
+
     public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
     public void applyNewVersion(String resultCode, BigDecimal normalizedScore,
-                                long totalTimeMs, long peakMemoryKb, String agentId, int resultVersion) {
+                                long totalTimeMs, long peakMemoryKb, String agentId, int resultVersion, String caseDetails) {
         this.resultCode = resultCode;
         this.normalizedScore = normalizedScore;
         this.totalTimeMs = totalTimeMs;
         this.peakMemoryKb = peakMemoryKb;
         this.agentId = agentId;
         this.resultVersion = resultVersion;
+        this.caseDetails = caseDetails;
     }
 }
