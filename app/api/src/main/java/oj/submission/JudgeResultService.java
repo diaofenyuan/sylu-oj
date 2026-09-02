@@ -49,7 +49,7 @@ public class JudgeResultService {
 
     public record ResultCommand(Long submissionId, String resultCode, BigDecimal normalizedScore,
                                 long totalTimeMs, long peakMemoryKb, int resultVersion,
-                                String agentId, List<TestcaseOutcome> testcases) {
+                                String agentId, List<TestcaseOutcome> testcases, String caseDetailsJson) {
     }
 
     @Transactional
@@ -72,10 +72,12 @@ public class JudgeResultService {
 
         JudgeResult result = judgeResultRepository.findBySubmissionId(submission.getId()).orElse(null);
         if (result == null) {
-            result = judgeResultRepository.save(new JudgeResult(submission, command.resultCode(),
+            result = new JudgeResult(submission, command.resultCode(),
                     score, command.totalTimeMs(), command.peakMemoryKb(),
                     command.agentId() == null ? "agent-1" : command.agentId(),
-                    Math.max(1, command.resultVersion())));
+                    Math.max(1, command.resultVersion()));
+            result.setCaseDetails(command.caseDetailsJson());
+            result = judgeResultRepository.save(result);
         } else {
             if (command.resultVersion() <= result.getResultVersion()) {
                 throw new ApiException(ErrorCode.STALE_RESULT_VERSION);
@@ -83,7 +85,7 @@ public class JudgeResultService {
             result.applyNewVersion(command.resultCode(), score, command.totalTimeMs(),
                     command.peakMemoryKb(),
                     command.agentId() == null ? result.getAgentId() : command.agentId(),
-                    command.resultVersion());
+                    command.resultVersion(), command.caseDetailsJson());
             testcaseResultRepository.deleteByJudgeResultId(result.getId());
         }
         if (command.testcases() != null) {

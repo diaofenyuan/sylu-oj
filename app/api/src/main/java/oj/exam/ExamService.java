@@ -431,7 +431,7 @@ public class ExamService {
         JudgeResult result = judgeResultRepository.findBySubmissionId(submissionId)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "判题结果不存在"));
         result.applyNewVersion(code, score, result.getTotalTimeMs(), result.getPeakMemoryKb(),
-                "grade-revision", result.getResultVersion() + 1);
+                "grade-revision", result.getResultVersion() + 1, result.getCaseDetails());
         return judgeResultRepository.saveAndFlush(result);
     }
 

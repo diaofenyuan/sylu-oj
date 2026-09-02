@@ -148,7 +148,8 @@ public class JudgeResultGatewayService {
                 command.testcases() == null ? null : command.testcases().stream()
                         .map(t -> new JudgeResultService.TestcaseOutcome(t.order(), t.status(),
                                 t.score(), t.timeMs(), t.memoryKb()))
-                        .toList()));
+                        .toList(),
+                serializeCaseDetails(command.testcases())));
 
         // 7. 任务完成 / SE 重试排程（同一事务）
         taskService.completeTask(task);
@@ -212,6 +213,17 @@ public class JudgeResultGatewayService {
                     node.path("memoryLimitMb").asLong(256));
         } catch (Exception e) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "判题配置解析失败");
+        }
+    }
+
+    private String serializeCaseDetails(java.util.List<GatewayTestcaseOutcome> testcases) {
+        if (testcases == null || testcases.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(testcases);
+        } catch (Exception e) {
+            return null;
         }
     }
 }
