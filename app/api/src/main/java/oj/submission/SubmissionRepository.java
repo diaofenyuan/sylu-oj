@@ -23,6 +23,8 @@ public interface SubmissionRepository extends JpaRepository<Submission, Long> {
 
     long countByAssignmentTargetIdAndStudentId(Long assignmentTargetId, Long studentId);
 
+    List<Submission> findByProblemIdAndJudgeStatus(Long problemId, String judgeStatus);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select s from Submission s where s.id = :id")
     Optional<Submission> findByIdForUpdate(@Param("id") Long id);

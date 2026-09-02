@@ -15,6 +15,7 @@ import oj.problem.Testcase;
 import oj.shared.AccessGuard;
 import oj.shared.ApiException;
 import oj.shared.ErrorCode;
+import oj.student.LeaderboardService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -52,6 +53,7 @@ public class StudentController {
     private final oj.submission.SubmissionCounterRepository counterRepository;
     private final JudgeResultRepository judgeResultRepository;
     private final JudgeRunService judgeRunService;
+    private final LeaderboardService leaderboardService;
     private final AccessGuard accessGuard;
     private final boolean localRunEnabled;
     private final Clock clock;
@@ -64,6 +66,7 @@ public class StudentController {
                              oj.submission.SubmissionCounterRepository counterRepository,
                              JudgeResultRepository judgeResultRepository,
                              JudgeRunService judgeRunService,
+                             LeaderboardService leaderboardService,
                              AccessGuard accessGuard,
                              @Value("${oj.judge.local-run.enabled:false}") boolean localRunEnabled,
                              Clock clock) {
@@ -75,6 +78,7 @@ public class StudentController {
         this.counterRepository = counterRepository;
         this.judgeResultRepository = judgeResultRepository;
         this.judgeRunService = judgeRunService;
+        this.leaderboardService = leaderboardService;
         this.accessGuard = accessGuard;
         this.localRunEnabled = localRunEnabled;
         this.clock = clock;
@@ -244,5 +248,16 @@ public class StudentController {
     public AnalyticsService.StudentAnalyticsRow myAnalytics(@PathVariable Long targetId) {
         var user = accessGuard.requireStudent();
         return analyticsService.ownAnalytics(user.studentId(), targetId);
+    }
+
+    /**
+     * 获取题目性能排行榜
+     */
+    @GetMapping("/problems/{problemId}/leaderboard")
+    public LeaderboardService.LeaderboardResponse getLeaderboard(
+            @PathVariable Long problemId,
+            @RequestParam(defaultValue = "50") int limit) {
+        accessGuard.requireStudent();
+        return leaderboardService.getLeaderboard(problemId, limit);
     }
 }
