@@ -1,11 +1,11 @@
 <template>
-  <div class="oj-workbench">
+  <div class="oj-workbench" :class="{ 'mobile-code': mobilePane === 'code' }" :style="{ '--editor-font-size': editorFontSize + 'px' }">
     <div v-if="loadError" class="workbench-error" role="alert">
       {{ loadError }} <button class="mini-btn" @click="loadProblems">重新加载</button>
     </div>
     <!-- 顶部工具条 -->
     <div class="wb-topbar">
-      <button class="tb-btn" @click="drawer = true">
+      <button class="tb-btn" @click="drawer = true" aria-haspopup="dialog" :aria-expanded="drawer">
         <Icon icon="mdi:format-list-bulleted" />
         题目列表
       </button>
@@ -17,8 +17,8 @@
         </span>
       </div>
       <div class="tb-nav">
-        <button class="tb-btn" :disabled="!hasPrev" @click="step(-1)">‹ 上一题</button>
-        <button class="tb-btn" :disabled="!hasNext" @click="step(1)">下一题 ›</button>
+        <button class="tb-btn" :disabled="!hasPrev" @click="step(-1)"><Icon icon="mdi:chevron-left" aria-hidden="true" />上一题</button>
+        <button class="tb-btn" :disabled="!hasNext" @click="step(1)">下一题<Icon icon="mdi:chevron-right" aria-hidden="true" /></button>
       </div>
       <div class="tb-progress">
         <strong>{{ passedCount }}</strong>/<span>{{ problems.length }}</span>
@@ -26,6 +26,10 @@
       </div>
     </div>
 
+    <div class="mobile-pane-tabs" role="group" aria-label="切换工作区">
+      <button :aria-pressed="mobilePane === 'problem'" @click="mobilePane = 'problem'"><Icon icon="mdi:text-box-outline" aria-hidden="true" />题目描述</button>
+      <button :aria-pressed="mobilePane === 'code'" @click="showMobileCode"><Icon icon="mdi:code-braces" aria-hidden="true" />代码与结果</button>
+    </div>
     <!-- 双栏主体 -->
     <div class="wb-body">
       <!-- 左栏:题面 -->
@@ -74,11 +78,11 @@
             <p class="pr-tip">提交后代码将进入隔离沙盒执行全部隐藏用例;自测运行不占提交次数。</p>
           </div>
         </template>
-        <div v-else class="pr-empty">{{ loading ? '题目加载中…' : '从右上角「题目列表」选择一道题' }}</div>
+        <div v-else class="pr-empty" role="status"><Icon icon="mdi:code-braces" aria-hidden="true" /><span>{{ loading ? '正在加载题目…' : '打开「题目列表」，开始下一次练习' }}</span></div>
       </section>
 
       <!-- 可拖拽分隔条 -->
-      <div class="wb-splitter" @mousedown="startDrag"></div>
+      <div class="wb-splitter" role="separator" aria-label="调整题面宽度" aria-orientation="vertical" :aria-valuenow="leftWidth" :aria-valuemin="320" :aria-valuemax="maxLeftWidth" tabindex="0" @mousedown="startDrag" @keydown.left.prevent="resizeLeft(-20)" @keydown.right.prevent="resizeLeft(20)"></div>
 
       <!-- 右栏:编辑器 + 结果面板 -->
       <section class="wb-right">
@@ -90,22 +94,19 @@
           <span class="mode-tag" role="status">{{ draftStatus }}</span>
           <button v-if="legacyDraft !== null" class="tb-btn" @click="restoreLegacyDraft">恢复旧版草稿</button>
           <span class="spacer"></span>
-          <button class="tb-btn" @click="showTemplates = true">
+          <select v-model.number="editorFontSize" aria-label="代码字号" @change="saveEditorFontSize"><option v-for="size in [13, 14, 16, 18]" :key="size" :value="size">{{ size }} px</option></select>
+          <button class="tb-btn" :disabled="!selected || problemLoading" @click="showTemplates = true">
             <Icon icon="mdi:code-braces" />
             模板
           </button>
-          <button class="tb-btn" @click="showLeaderboard = true">
-            <Icon icon="mdi:trophy" />
-            排行榜
-          </button>
-          <button class="tb-btn" @click="showShortcuts = true">
-            <Icon icon="mdi:keyboard" />
-            快捷键
-          </button>
-          <button class="tb-btn" @click="resetCode">
-            <Icon icon="mdi:refresh" />
-            重置代码
-          </button>
+          <details ref="moreTools" class="more-tools">
+            <summary aria-label="更多编辑器工具"><Icon icon="mdi:dots-horizontal" aria-hidden="true" /></summary>
+            <div class="tools-menu">
+              <button @click="openTool('shortcuts')"><Icon icon="mdi:keyboard-outline" aria-hidden="true" />快捷键</button>
+              <button @click="openTool('leaderboard')"><Icon icon="mdi:trophy-outline" aria-hidden="true" />性能排行榜</button>
+              <button @click="openTool('reset')" :disabled="!selected || problemLoading"><Icon icon="mdi:refresh" aria-hidden="true" />重置代码</button>
+            </div>
+          </details>
         </div>
 
         <div class="cm-wrap" :inert="problemLoading || !selected">
@@ -114,14 +115,16 @@
 
         <!-- 底部结果面板 -->
         <div class="result-panel" :class="{ collapsed: !panelOpen }">
-          <div class="rp-tabs" role="tablist">
+          <div class="rp-header">
+          <div class="rp-tabs" role="group" aria-label="评测面板">
             <button v-for="t in panels" :key="t.key" class="rp-tab"
-                    :class="{ active: panel === t.key && panelOpen }" @click="openPanel(t.key)">
+                    :aria-pressed="panel === t.key && panelOpen" :class="{ active: panel === t.key && panelOpen }" @click="openPanel(t.key)">
               {{ t.label }}
               <em v-if="t.key === 'submissions'" class="rp-badge">{{ submissions.length }}</em>
             </button>
-            <span class="spacer"></span>
-            <button class="mini-btn" @click="panelOpen = !panelOpen">{{ panelOpen ? '▾ 收起' : '▴ 展开' }}</button>
+          </div>
+          <div class="run-actions">
+            <button class="mini-btn panel-toggle" @click="panelOpen = !panelOpen" :aria-label="panelOpen ? '收起结果面板' : '展开结果面板'" :aria-expanded="panelOpen"><Icon :icon="panelOpen ? 'mdi:chevron-down' : 'mdi:chevron-up'" aria-hidden="true" /></button>
             <button class="run-btn" :disabled="running || !selected || !code.trim() || !canSubmitNow" @click="runFromButton">
               <Icon :icon="running ? 'mdi:loading' : 'mdi:play'" :class="{ 'spin-icon': running }" />
               {{ running ? '运行中…' : '自测运行' }}
@@ -129,8 +132,9 @@
             <button class="submit-btn"
                     :disabled="submitting || !selected || !code.trim() || !canSubmitNow || limitReached" @click="submit">
               <Icon :icon="submitting ? 'mdi:loading' : 'mdi:send'" :class="{ 'spin-icon': submitting }" />
-              {{ submitting ? '提交中…' : problemLoading ? '题目加载中…' : !canSubmitNow ? '窗口未开放' : limitReached ? '次数已用尽' : '保存并提交' }}
+              {{ submitting ? '提交中…' : problemLoading ? '题目加载中…' : !canSubmitNow ? '窗口未开放' : limitReached ? '次数已用尽' : '提交评测' }}
             </button>
+          </div>
           </div>
 
           <div v-if="panelOpen" class="rp-body">
@@ -140,7 +144,7 @@
             </p>
             <!-- 执行结果 -->
             <template v-if="panel === 'result'">
-              <div v-if="resultPhase === 'idle'" class="rp-idle">保存并提交之后,这里将会显示运行结果</div>
+              <div v-if="resultPhase === 'idle'" class="rp-idle"><Icon icon="mdi:console-line" aria-hidden="true" /><span>先自测，再提交</span><small>自测不占提交次数，提交评测后在这里查看结果。</small></div>
               <div v-else-if="resultPhase === 'pending'" class="rp-pending">
                 <Icon icon="mdi:loading" class="spin-icon" /> 代码已送入安全沙盒,正在评测隐藏用例…
               </div>
@@ -251,12 +255,12 @@
 
     <!-- 题目列表抽屉 -->
     <div v-if="drawer" class="drawer-mask" @click.self="drawer = false">
-      <div class="drawer">
+      <div ref="drawerPanel" class="drawer" role="dialog" aria-modal="true" aria-label="题目列表" tabindex="-1">
         <div class="drawer-head">
           <strong>题目列表</strong>
           <span class="spacer"></span>
           <span class="muted">{{ passedCount }}/{{ problems.length }} 已通过</span>
-          <button class="mini-btn" @click="drawer = false">✕</button>
+          <button class="mini-btn" @click="drawer = false" aria-label="关闭题目列表"><Icon icon="mdi:close" aria-hidden="true" /></button>
         </div>
         <div v-if="isAssignment && meta" class="drawer-progress">
           <ProgressCard
@@ -280,8 +284,8 @@
           </button>
         </div>
         <div class="list-toolbar">
-          <input v-model.trim="keyword" placeholder="搜索题目" />
-          <select v-model="statusFilter">
+          <input v-model.trim="keyword" placeholder="搜索题号或题目" aria-label="搜索题目" type="search" />
+          <select v-model="statusFilter" aria-label="题目状态">
             <option value="ALL">全部状态</option>
             <option value="UNATTEMPTED">未开始</option>
             <option value="ATTEMPTED">已尝试</option>
@@ -308,13 +312,14 @@
     <ShortcutHelp :visible="showShortcuts" @close="showShortcuts = false" />
     <Leaderboard :visible="showLeaderboard" :problem-id="selected?.problemId" @close="showLeaderboard = false" />
 
-    <div v-if="tipText" class="copy-tip">{{ tipText }}</div>
+    <div v-if="tipText" class="copy-tip" role="status">{{ tipText }}</div>
   </div>
 </template>
 
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
+import { useDialogFocus } from '../composables/useDialogFocus'
 import { createDraftStore } from '../composables/draftStore'
 import { normalizeOutput, selfTestFeedback } from '../composables/selfTestFeedback'
 import { summarizeSubmissions } from '../composables/submissionSummary'
@@ -356,8 +361,8 @@ const canSubmitNow = computed(() =>
 // VS Code Dark+ 风格的主题
 const vscodeTheme = [
   EditorView.theme({
-    '&': { color: '#d4d4d4', backgroundColor: '#1e1e1e', height: '100%', fontSize: '13.5px' },
-    '.cm-content': { caretColor: '#aeafad', fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace" },
+    '&': { color: '#d4d4d4', backgroundColor: '#1e1e1e', height: '100%', fontSize: 'var(--editor-font-size, 14px)' },
+    '.cm-content': { caretColor: '#aeafad', padding: '16px 0', fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace" },
     '.cm-cursor, .cm-dropCursor': { borderLeftColor: '#aeafad' },
     '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
       backgroundColor: '#264f7890'
@@ -367,7 +372,7 @@ const vscodeTheme = [
     '.cm-gutters': { backgroundColor: '#1e1e1e', color: '#858585', border: 'none', borderRight: '1px solid #333333' },
     '.cm-lineNumbers .cm-gutterElement': { padding: '0 9px 0 12px', minWidth: '38px' },
     '.cm-foldGutter': { color: '#858585' },
-    '.cm-scroller': { lineHeight: '1.55', fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace" },
+    '.cm-scroller': { lineHeight: '1.7', fontFamily: "'Cascadia Code', 'JetBrains Mono', Consolas, monospace" },
     '.cm-matchingBracket': { backgroundColor: '#3a3d4180', outline: '1px solid #85858580' },
     '.cm-selectionMatch': { backgroundColor: '#264f7880' },
     '.cm-tooltip': { border: '1px solid #454545', backgroundColor: '#252526', color: '#d4d4d4', fontFamily: "Consolas, monospace" },
@@ -430,6 +435,21 @@ const loading = ref(true)
 const problemLoading = ref(false)
 const loadError = ref('')
 const drawer = ref(false)
+const drawerPanel = ref(null)
+useDialogFocus(() => drawer.value, drawerPanel, () => { drawer.value = false })
+const moreTools = ref(null)
+const mobilePane = ref('problem')
+async function showMobileCode() { mobilePane.value = 'code'; await nextTick(); editorView?.requestMeasure() }
+const savedFontSize = Number(localStorage.getItem('oj-editor-font-size'))
+const editorFontSize = ref([13, 14, 16, 18].includes(savedFontSize) ? savedFontSize : 14)
+function saveEditorFontSize() { localStorage.setItem('oj-editor-font-size', editorFontSize.value) }
+function openTool(tool) {
+  moreTools.value.open = false
+  moreTools.value.querySelector('summary').focus()
+  if (tool === 'shortcuts') showShortcuts.value = true
+  if (tool === 'leaderboard') showLeaderboard.value = true
+  if (tool === 'reset') resetCode()
+}
 
 const language = ref('CPP')
 const code = ref('')
@@ -457,6 +477,15 @@ const selfTestContext = ref(null)
 let runVersion = 0
 const submissions = ref([])
 const leftWidth = ref(480)
+const viewportWidth = ref(window.innerWidth)
+const maxLeftWidth = computed(() => Math.max(320, viewportWidth.value - 420))
+function resizeLeft(delta) { leftWidth.value = Math.min(maxLeftWidth.value, Math.max(320, leftWidth.value + delta)) }
+function onViewportResize() {
+  viewportWidth.value = window.innerWidth
+  // 手机端不显示分栏，保留桌面宽度，避免切回桌面时题面被压窄。
+  if (viewportWidth.value > 900) resizeLeft(0)
+}
+let stopResize = () => {}
 const showTemplates = ref(false)
 const showShortcuts = ref(false)
 const showLeaderboard = ref(false)
@@ -587,6 +616,7 @@ function createEditorState(doc) {
   return EditorState.create({
       doc,
       extensions: [
+        EditorView.contentAttributes.of({ 'aria-label': '代码编辑器' }),
         lineNumbers(),
         highlightActiveLineGutter(),
         highlightActiveLine(),
@@ -907,6 +937,7 @@ function runFromButton() {
 
 function runSample(sample) {
   selfTestInput.value = sample.input ?? ''
+  showMobileCode()
   runFromButton()
 }
 
@@ -920,7 +951,7 @@ function startDrag(event) {
   const startX = event.clientX
   const startWidth = leftWidth.value
   const onMove = e => {
-    leftWidth.value = Math.min(Math.max(320, startWidth + e.clientX - startX), window.innerWidth - 420)
+    leftWidth.value = Math.min(Math.max(320, startWidth + e.clientX - startX), maxLeftWidth.value)
   }
   const onUp = () => {
     window.removeEventListener('mousemove', onMove)
@@ -928,9 +959,12 @@ function startDrag(event) {
   }
   window.addEventListener('mousemove', onMove)
   window.addEventListener('mouseup', onUp)
+  stopResize = onUp
 }
 
 function onKeydown(event) {
+  if (drawer.value || showTemplates.value || showShortcuts.value || showLeaderboard.value) return
+  if (event.key === 'Escape' && moreTools.value?.open) { moreTools.value.open = false; moreTools.value.querySelector('summary').focus(); return }
   const mod = event.ctrlKey || event.metaKey
   const key = event.key.toLowerCase()
   const handled = mod && (['enter', 's', '/'].includes(key)
@@ -972,6 +1006,7 @@ function onKeydown(event) {
 onMounted(() => {
   loadProblems()
   window.addEventListener('keydown', onKeydown, true)
+  window.addEventListener('resize', onViewportResize)
 })
 onBeforeUnmount(() => {
   selectionVersion++
@@ -979,6 +1014,8 @@ onBeforeUnmount(() => {
   statusVersion++
   detailsVersion++
   clearPoll()
+  stopResize()
+  window.removeEventListener('resize', onViewportResize)
   window.removeEventListener('keydown', onKeydown, true)
   editorView?.destroy()
   editorView = null
@@ -1003,12 +1040,12 @@ onBeforeUnmount(() => {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 9px 16px;
+  padding: 12px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--panel);
 }
 .tb-btn {
-  background: #fff;
+  background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border-strong);
   box-shadow: none;
@@ -1034,18 +1071,19 @@ onBeforeUnmount(() => {
   background: var(--panel);
   min-height: 0;
 }
-.pr-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+.pr-head { padding: 24px 28px 18px; border-bottom: 1px solid var(--border); }
 .pr-head h3 { margin: 0 0 8px; font-size: 19px; }
 .pr-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .meta-item { color: var(--muted); font-size: 12.5px; }
-.pr-scroll { flex: 1; overflow-y: auto; padding: 16px 20px 24px; min-height: 0; }
-.pr-desc { white-space: pre-wrap; line-height: 1.85; font-size: 14px; }
+.pr-scroll { flex: 1; overflow-y: auto; padding: 24px 28px 32px; min-height: 0; }
+.pr-desc { white-space: pre-wrap; line-height: 1.9; font-size: 15px; overflow-wrap: anywhere; }
 .pr-samples { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
 .sample-box { border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); padding: 11px 13px; }
-.sample-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.sample-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.sample-head strong, .sample-head button { white-space: nowrap; }
 .sample-head .spacer { flex: 1; }
 .mini-btn {
-  background: #fff;
+  background: var(--panel);
   color: var(--muted);
   border: 1px solid var(--border);
   box-shadow: none;
@@ -1058,16 +1096,17 @@ onBeforeUnmount(() => {
 .sample-io pre { margin: 0; font: 12.5px/1.55 Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
 .pr-tip { margin-top: 20px; font-size: 12.5px; color: var(--muted); }
 .closed-tip { color: var(--danger); font-weight: 600; }
-.pr-empty { flex: 1; display: grid; place-items: center; color: var(--muted); padding: 30px; }
+.pr-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: var(--muted); padding: 40px; }
+.pr-empty > svg { width: 32px; height: 32px; }
 
 .wb-splitter {
   flex: none;
-  width: 5px;
+  width: 7px;
   cursor: col-resize;
   background: var(--border);
   transition: background 0.15s ease;
 }
-.wb-splitter:hover { background: var(--accent); }
+.wb-splitter:hover, .wb-splitter:focus-visible { background: var(--accent); }
 
 .wb-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #1e1e1e; }
 .code-toolbar {
@@ -1080,7 +1119,7 @@ onBeforeUnmount(() => {
 }
 .code-toolbar select { background: #3c3c3c; color: #cccccc; border: 1px solid #454545; padding: 5px 10px; font-size: 13px; }
 .code-toolbar select:hover { border-color: #5a5a5a; }
-.mode-tag { color: #8a8a8a; font-size: 12px; }
+.mode-tag { color: #b1b8c2; font-size: 12px; }
 .code-toolbar .tb-btn { background: #3c3c3c; color: #cccccc; border: 1px solid transparent; }
 .code-toolbar .tb-btn:hover:not(:disabled) { background: #4a4a4a; color: #fff; border-color: transparent; }
 .code-toolbar .spacer { flex: 1; }
@@ -1110,14 +1149,13 @@ onBeforeUnmount(() => {
 .cm-host :deep(.cm-editor) { height: 100%; }
 .cm-host :deep(.cm-gutters) { border-right: 1px solid #333333; }
 
-.result-panel { flex: none; border-top: 1px solid #334155; background: #fff; display: flex; flex-direction: column; height: 250px; }
+.result-panel { flex: none; border-top: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; height: clamp(190px, 28vh, 280px); }
 .result-panel.collapsed { height: auto; }
 .rp-tabs {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 0;
   flex: none;
 }
 .rp-tab {
@@ -1131,15 +1169,17 @@ onBeforeUnmount(() => {
 }
 .rp-tab:hover:not(:disabled) { background: var(--panel-2); box-shadow: none; }
 .rp-tab.active { color: var(--accent); background: var(--accent-soft); font-weight: 700; }
-.rp-badge { font-style: normal; font-size: 11px; background: #e2e8f0; border-radius: 999px; padding: 0 6px; margin-left: 4px; }
-.run-btn { background: #16a34a; }
-.run-btn:hover:not(:disabled) { background: #15803d; }
-.submit-btn { background: var(--accent); }
-.submit-btn:hover:not(:disabled) { background: var(--accent-strong); }
+.rp-badge { font-style: normal; font-size: 11px; background: var(--panel-2); border-radius: 999px; padding: 0 6px; margin-left: 4px; }
+.run-btn { background: var(--panel); color: var(--ok); border-color: var(--border-strong); }
+.run-btn:hover:not(:disabled) { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.submit-btn { background: var(--button-bg); }
+.submit-btn:hover:not(:disabled) { background: var(--button-hover); }
 .result-panel .rp-tabs .mini-btn { border-color: var(--border-strong); }
 
 .rp-body { flex: 1; overflow-y: auto; padding: 12px 16px; min-height: 0; }
-.rp-idle { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 13.5px; }
+.rp-idle { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 120px; height: 100%; color: var(--muted); font-size: 14px; text-align: center; padding: 12px; }
+.rp-idle > svg { width: 26px; height: 26px; color: var(--muted); margin-bottom: 3px; }
+.rp-idle small { font-size: 12px; }
 .rp-pending { display: flex; align-items: center; gap: 10px; height: 100%; justify-content: center; color: var(--accent); font-size: 14px; }
 .spin {
   width: 15px;
@@ -1187,9 +1227,9 @@ onBeforeUnmount(() => {
 .drawer-progress { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
 .drawer-progress :deep(.progress-card) { box-shadow: none; border: none; background: transparent; padding: 0; }
 .level-strip { display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap; }
-.level-tab { border: 1px solid var(--border); background: #fff; color: var(--muted); box-shadow: none; padding: 7px 11px; font-size: 12.5px; border-radius: 9px; }
+.level-tab { border: 1px solid var(--border); background: var(--panel); color: var(--muted); box-shadow: none; padding: 7px 11px; font-size: 12.5px; border-radius: 9px; }
 .level-tab:hover { box-shadow: none; background: var(--panel-2); }
-.level-tab.active { background: var(--accent-soft); border-color: #bfd4ff; color: var(--accent-strong); }
+.level-tab.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-strong); }
 .level-tab small { margin-left: 5px; opacity: 0.75; }
 .list-toolbar { display: flex; gap: 8px; padding: 12px 16px; }
 .list-toolbar input { flex: 1; min-width: 0; padding: 8px 10px; }
@@ -1248,8 +1288,6 @@ onBeforeUnmount(() => {
   .assign-meta { flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px; }
   .assign-title { flex-basis: 100%; }
   .pr-scroll { flex: none; overflow: visible; }
-  .sample-head { flex-wrap: wrap; }
-  .sample-head strong { white-space: nowrap; }
   .sample-head .spacer, .code-toolbar .spacer, .rp-tabs .spacer { display: none; }
   .code-toolbar { flex-wrap: wrap; gap: 6px; }
   .code-toolbar > button, .code-toolbar select, .file-tab { flex-shrink: 0; }
@@ -1260,5 +1298,41 @@ onBeforeUnmount(() => {
   .rp-body { flex: none; max-height: 400px; }
   .rp-idle, .rp-pending { height: auto; min-height: 100px; }
   .result-line, .st-label { flex-wrap: wrap; gap: 8px; }
+}
+
+.mobile-pane-tabs { display: none; }
+.rp-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-bottom: 1px solid var(--border); }
+.run-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.panel-toggle { padding: 7px; }
+.code-toolbar { flex-wrap: wrap; }
+.more-tools { position: relative; color: #d5dbe4; }
+.more-tools summary { display: grid; place-items: center; list-style: none; width: 38px; height: 38px; border: 1px solid #454545; border-radius: 8px; cursor: pointer; }
+.more-tools summary::-webkit-details-marker { display: none; }
+.more-tools summary:hover { background: #3c3c3c; }
+.more-tools summary svg { width: 22px; height: 22px; }
+.tools-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 60; width: 180px; padding: 6px; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; box-shadow: var(--shadow-md); }
+.tools-menu button { width: 100%; background: transparent; color: var(--text); justify-content: flex-start; font-size: 13px; font-weight: 500; }
+.tools-menu button:hover { color: var(--accent); background: var(--accent-soft); }
+.drawer:focus { outline: none; }
+@media (max-width: 900px) {
+  .mobile-pane-tabs { display: flex; gap: 4px; padding: 8px 16px; background: var(--panel); border-bottom: 1px solid var(--border); }
+  .mobile-pane-tabs button { flex: 1; background: transparent; color: var(--muted); }
+  .mobile-pane-tabs button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .oj-workbench:not(.mobile-code) .wb-right, .oj-workbench.mobile-code .wb-left { display: none; }
+  .pr-head { padding: 20px; }
+  .pr-scroll { padding: 20px; }
+  .code-toolbar .mode-tag { flex-basis: 100%; }
+  .run-actions { width: 100%; }
+  .run-actions .run-btn, .run-actions .submit-btn { flex: 1; }
+  .rp-tabs { width: 100%; justify-content: space-between; }
+  .rp-tab { padding: 8px; font-size: 13px; }
+}
+@media (max-width: 600px) {
+  .tb-title { grid-column: 1 / -1; grid-row: 1; min-height: 28px; }
+  .wb-topbar > .tb-btn { grid-column: 1; grid-row: 2; justify-self: start; }
+  .tb-nav { grid-column: 2; grid-row: 2; justify-self: end; }
+  .tb-nav .tb-btn { padding-inline: 9px; }
+  .tb-progress { display: none; }
+  .code-toolbar .file-tab { display: none; }
 }
 </style>

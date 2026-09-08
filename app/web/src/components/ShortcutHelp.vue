@@ -1,10 +1,10 @@
 <template>
   <div class="shortcut-help" v-if="visible" @click.self="$emit('close')">
-    <div class="help-content">
+    <div ref="dialogPanel" class="help-content" role="dialog" aria-modal="true" aria-label="快捷键帮助" tabindex="-1">
       <div class="help-header">
         <Icon icon="mdi:keyboard" class="keyboard-icon" />
         <h3>快捷键帮助</h3>
-        <button class="close-btn" @click="$emit('close')">
+        <button aria-label="关闭快捷键帮助" class="close-btn" @click="$emit('close')">
           <Icon icon="mdi:close" />
         </button>
       </div>
@@ -33,18 +33,6 @@
                 <kbd>Ctrl</kbd> + <kbd>Y</kbd>
               </span>
               <span class="shortcut-desc">重做</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="shortcut-keys">
-                <kbd>Ctrl</kbd> + <kbd>F</kbd>
-              </span>
-              <span class="shortcut-desc">查找</span>
-            </div>
-            <div class="shortcut-item">
-              <span class="shortcut-keys">
-                <kbd>Ctrl</kbd> + <kbd>H</kbd>
-              </span>
-              <span class="shortcut-desc">替换</span>
             </div>
             <div class="shortcut-item">
               <span class="shortcut-keys">
@@ -100,12 +88,6 @@
               </span>
               <span class="shortcut-desc">下一题</span>
             </div>
-            <div class="shortcut-item">
-              <span class="shortcut-keys">
-                <kbd>Ctrl</kbd> + <kbd>L</kbd>
-              </span>
-              <span class="shortcut-desc">打开题目列表</span>
-            </div>
           </div>
         </div>
 
@@ -131,7 +113,7 @@
               <span class="shortcut-keys">
                 <kbd>Esc</kbd>
               </span>
-              <span class="shortcut-desc">关闭弹窗/面板</span>
+              <span class="shortcut-desc">关闭弹窗或工具菜单</span>
             </div>
           </div>
         </div>
@@ -146,11 +128,15 @@
 </template>
 
 <script setup>
-defineProps({
+import { ref } from 'vue'
+import { useDialogFocus } from '../composables/useDialogFocus'
+const props = defineProps({
   visible: Boolean
 })
 
-defineEmits(['close'])
+const emit = defineEmits(['close'])
+const dialogPanel = ref(null)
+useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 </script>
 
 <style scoped>
@@ -260,7 +246,6 @@ defineEmits(['close'])
 
 .shortcut-item:hover {
   background: var(--bg);
-  transform: translateX(4px);
 }
 
 .shortcut-keys {
@@ -331,4 +316,5 @@ kbd {
     flex-wrap: wrap;
   }
 }
+.help-content:focus { outline: none; }
 </style>

@@ -1,10 +1,10 @@
 <template>
   <div class="template-picker" v-if="visible" @click.self="$emit('close')">
-    <div class="picker-content">
+    <div ref="dialogPanel" class="picker-content" role="dialog" aria-modal="true" aria-label="代码模板" tabindex="-1">
       <div class="picker-header">
         <Icon icon="mdi:code-braces" />
         <h3>代码模板</h3>
-        <button class="close-btn" @click="$emit('close')">
+        <button aria-label="关闭代码模板" class="close-btn" @click="$emit('close')">
           <Icon icon="mdi:close" />
         </button>
       </div>
@@ -28,7 +28,7 @@
         </div>
 
         <div v-if="activeTab === 'basic'" class="template-section">
-          <div class="template-card" @click="insertBasicTemplate">
+          <div class="template-card" role="button" tabindex="0" @keydown.enter.prevent="insertBasicTemplate" @keydown.space.prevent="insertBasicTemplate" @click="insertBasicTemplate">
             <div class="card-header">
               <Icon icon="mdi:file-code" class="card-icon" />
               <div class="card-info">
@@ -56,7 +56,7 @@
             <div 
               v-for="(snippet, idx) in snippets" 
               :key="idx"
-              class="snippet-card"
+              class="snippet-card" role="button" tabindex="0" @keydown.enter.prevent="insertSnippet(snippet)" @keydown.space.prevent="insertSnippet(snippet)"
               @click="insertSnippet(snippet)">
               <div class="snippet-header">
                 <div class="snippet-icon">
@@ -80,6 +80,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useDialogFocus } from '../composables/useDialogFocus'
 import { useCodeTemplates } from '../composables/useCodeTemplates'
 
 const props = defineProps({
@@ -104,6 +105,8 @@ function insertSnippet(snippet) {
   emit('insert', snippet.code)
   emit('close')
 }
+const dialogPanel = ref(null)
+useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 </script>
 
 <style scoped>
@@ -185,7 +188,7 @@ function insertSnippet(snippet) {
 }
 
 .tab-btn.active {
-  background: var(--accent);
+  background: var(--button-bg);
   border-color: var(--accent);
   color: #fff;
 }
@@ -203,7 +206,6 @@ function insertSnippet(snippet) {
 .template-card:hover, .snippet-card:hover {
   background: var(--bg);
   border-color: var(--accent);
-  transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 
@@ -270,7 +272,7 @@ function insertSnippet(snippet) {
   justify-content: center;
   gap: 6px;
   padding: 8px;
-  background: var(--accent);
+  background: var(--button-bg);
   color: #fff;
   border-radius: 6px;
   font-weight: 600;
@@ -290,4 +292,5 @@ function insertSnippet(snippet) {
   font-size: 48px;
   opacity: 0.5;
 }
+.picker-content:focus { outline: none; }
 </style>

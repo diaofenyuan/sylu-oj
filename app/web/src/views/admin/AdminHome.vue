@@ -5,8 +5,8 @@
       <p class="muted">维护学期、专业、课程、教学班、师生与授课关系，查看审计事件</p>
     </div>
 
-    <div class="tabs">
-      <button v-for="t in tabs" :key="t.key" class="tab" :class="{ active: tab === t.key }" @click="tab = t.key">
+    <div class="tabs" role="group" aria-label="管理功能">
+      <button v-for="t in tabs" :key="t.key" class="tab" :class="{ active: tab === t.key }" :aria-pressed="tab === t.key" @click="tab = t.key">
         {{ t.label }}
       </button>
     </div>
@@ -22,13 +22,13 @@
         <div class="wiz-grid">
           <div class="wiz-block">
             <h4>1. 学期</h4>
-            <select v-model="wiz.termMode" class="wide">
+            <select v-model="wiz.termMode" aria-label="选择学期" class="wide">
               <option v-for="t in terms" :key="t.id" :value="'use:' + t.id">使用：{{ t.name }}</option>
               <option value="new">+ 新建学期</option>
             </select>
             <div v-if="wiz.termMode === 'new'" class="wiz-fields">
-              <input v-model="wiz.term.code" placeholder="学期代码 如 2026S1" />
-              <input v-model="wiz.term.name" placeholder="学期名称" />
+              <input v-model="wiz.term.code" placeholder="学期代码 如 2026S1" aria-label="学期代码 如 2026S1" />
+              <input v-model="wiz.term.name" placeholder="学期名称" aria-label="学期名称" />
               <div class="row">
                 <input v-model="wiz.term.startDate" type="date" />
                 <span class="muted">至</span>
@@ -39,39 +39,39 @@
 
           <div class="wiz-block">
             <h4>2. 课程</h4>
-            <select v-model="wiz.courseMode" class="wide">
+            <select v-model="wiz.courseMode" aria-label="选择课程" class="wide">
               <option v-for="c in courses" :key="c.id" :value="'use:' + c.id">使用：{{ c.name }}（{{ c.code }}）</option>
               <option value="new">+ 新建课程</option>
             </select>
             <div v-if="wiz.courseMode === 'new'" class="wiz-fields">
-              <input v-model="wiz.course.code" placeholder="课程代码 如 CS101" />
-              <input v-model="wiz.course.name" placeholder="课程名称" />
-              <input v-model="wiz.course.credit" type="number" step="0.5" min="0" placeholder="学分（默认 1）" />
+              <input v-model="wiz.course.code" placeholder="课程代码 如 CS101" aria-label="课程代码 如 CS101" />
+              <input v-model="wiz.course.name" placeholder="课程名称" aria-label="课程名称" />
+              <input v-model="wiz.course.credit" type="number" step="0.5" min="0" placeholder="学分（默认 1）" aria-label="学分（默认 1）" />
             </div>
           </div>
 
           <div class="wiz-block">
             <h4>3. 教学班</h4>
             <div class="wiz-fields">
-              <input v-model="wiz.classCode" placeholder="班级代码 如 CS101-01" />
-              <input v-model="wiz.className" placeholder="班级名称 如 01班" />
+              <input v-model="wiz.classCode" placeholder="班级代码 如 CS101-01" aria-label="班级代码 如 CS101-01" />
+              <input v-model="wiz.className" placeholder="班级名称 如 01班" aria-label="班级名称 如 01班" />
             </div>
           </div>
 
           <div class="wiz-block">
             <h4>4. 主讲教师</h4>
-            <select v-model="wiz.teacherMode" class="wide">
+            <select v-model="wiz.teacherMode" aria-label="选择教师" class="wide">
               <option v-for="t in teachers" :key="t.id" :value="'use:' + t.id">使用：{{ t.name }}（{{ t.staffNo }}）</option>
               <option value="new">+ 新建教师（自动开通登录账号）</option>
             </select>
             <div v-if="wiz.teacherMode === 'new'" class="wiz-fields">
               <div class="row">
-                <input v-model="wiz.teacher.staffNo" placeholder="工号 如 T2026002" />
-                <input v-model="wiz.teacher.name" placeholder="姓名" />
+                <input v-model="wiz.teacher.staffNo" placeholder="工号 如 T2026002" aria-label="工号 如 T2026002" />
+                <input v-model="wiz.teacher.name" placeholder="姓名" aria-label="姓名" />
               </div>
               <div class="row">
-                <input v-model="wiz.teacher.login" placeholder="登录账号（默认=工号）" />
-                <input v-model="wiz.teacher.password" placeholder="初始密码" />
+                <input v-model="wiz.teacher.login" placeholder="登录账号（默认=工号）" aria-label="登录账号（默认=工号）" />
+                <input v-model="wiz.teacher.password" type="password" autocomplete="new-password" placeholder="初始密码" aria-label="初始密码" />
               </div>
             </div>
           </div>
@@ -81,7 +81,7 @@
             <textarea v-model="wiz.studentsText" rows="6" placeholder="每行一个学生，格式：学号,姓名&#10;20260001,张三&#10;20260002,李四"></textarea>
             <div class="row" style="margin-top: 10px;">
               <label class="chk"><input type="checkbox" v-model="wiz.stuAccount" /> 同时开通学生登录账号</label>
-              <input v-if="wiz.stuAccount" v-model="wiz.stuPassword" placeholder="学生初始密码" class="slim" />
+              <input v-if="wiz.stuAccount" v-model="wiz.stuPassword" type="password" autocomplete="new-password" placeholder="学生初始密码" class="slim" aria-label="学生初始密码" />
             </div>
           </div>
         </div>
@@ -102,8 +102,8 @@
         <div class="row section-head">
           <h3>学期</h3>
           <div class="spacer"></div>
-          <input v-model="termForm.code" placeholder="学期代码 如 2026S1" class="slim" />
-          <input v-model="termForm.name" placeholder="学期名称" class="slim" />
+          <input v-model="termForm.code" placeholder="学期代码 如 2026S1" class="slim" aria-label="学期代码 如 2026S1" />
+          <input v-model="termForm.name" placeholder="学期名称" class="slim" aria-label="学期名称" />
           <input v-model="termForm.startDate" type="date" class="slim" />
           <input v-model="termForm.endDate" type="date" class="slim" />
           <button @click="createTerm">新增学期</button>
@@ -125,8 +125,8 @@
         <div class="row section-head">
           <h3>专业</h3>
           <div class="spacer"></div>
-          <input v-model="majorForm.code" placeholder="专业代码" class="slim" />
-          <input v-model="majorForm.name" placeholder="专业名称" class="slim" />
+          <input v-model="majorForm.code" placeholder="专业代码" class="slim" aria-label="专业代码" />
+          <input v-model="majorForm.name" placeholder="专业名称" class="slim" aria-label="专业名称" />
           <button @click="createMajor">新增专业</button>
         </div>
         <table>
@@ -139,9 +139,9 @@
         <div class="row section-head">
           <h3>课程</h3>
           <div class="spacer"></div>
-          <input v-model="courseForm.code" placeholder="课程代码" class="slim" />
-          <input v-model="courseForm.name" placeholder="课程名称" class="slim" />
-          <input v-model="courseForm.credit" type="number" step="0.5" min="0" placeholder="学分" class="slim tiny" />
+          <input v-model="courseForm.code" placeholder="课程代码" class="slim" aria-label="课程代码" />
+          <input v-model="courseForm.name" placeholder="课程名称" class="slim" aria-label="课程名称" />
+          <input v-model="courseForm.credit" type="number" step="0.5" min="0" placeholder="学分" class="slim tiny" aria-label="学分" />
           <button @click="createCourse">新增课程</button>
         </div>
         <table>
@@ -154,11 +154,11 @@
         <div class="row section-head">
           <h3>教学班</h3>
           <div class="spacer"></div>
-          <select v-model="classForm.termId" class="slim"><option value="">选择学期</option><option v-for="t in terms" :key="t.id" :value="t.id">{{ t.name }}</option></select>
-          <select v-model="classForm.courseId" class="slim"><option value="">选择课程</option><option v-for="c in courses" :key="c.id" :value="c.id">{{ c.name }}</option></select>
-          <select v-model="classForm.majorId" class="slim"><option value="">不限专业</option><option v-for="m in majors" :key="m.id" :value="m.id">{{ m.name }}</option></select>
-          <input v-model="classForm.code" placeholder="班级代码" class="slim" />
-          <input v-model="classForm.name" placeholder="班级名称" class="slim" />
+          <select v-model="classForm.termId" aria-label="选择学期" class="slim"><option value="">选择学期</option><option v-for="t in terms" :key="t.id" :value="t.id">{{ t.name }}</option></select>
+          <select v-model="classForm.courseId" aria-label="选择课程" class="slim"><option value="">选择课程</option><option v-for="c in courses" :key="c.id" :value="c.id">{{ c.name }}</option></select>
+          <select v-model="classForm.majorId" aria-label="选择专业" class="slim"><option value="">不限专业</option><option v-for="m in majors" :key="m.id" :value="m.id">{{ m.name }}</option></select>
+          <input v-model="classForm.code" placeholder="班级代码" class="slim" aria-label="班级代码" />
+          <input v-model="classForm.name" placeholder="班级名称" class="slim" aria-label="班级名称" />
           <button @click="createClass">新增教学班</button>
         </div>
         <table>
@@ -179,8 +179,8 @@
         <div class="row section-head">
           <h3>教师</h3>
           <div class="spacer"></div>
-          <input v-model="teacherForm.staffNo" placeholder="工号" class="slim" />
-          <input v-model="teacherForm.name" placeholder="姓名" class="slim" />
+          <input v-model="teacherForm.staffNo" placeholder="工号" class="slim" aria-label="工号" />
+          <input v-model="teacherForm.name" placeholder="姓名" class="slim" aria-label="姓名" />
           <button @click="createTeacher">新增教师</button>
         </div>
         <table>
@@ -193,9 +193,9 @@
         <div class="row section-head">
           <h3>学生</h3>
           <div class="spacer"></div>
-          <input v-model="studentKeyword" placeholder="按学号/姓名搜索" class="slim" @input="searchStudents" />
-          <input v-model="studentForm.studentNo" placeholder="学号" class="slim" />
-          <input v-model="studentForm.name" placeholder="姓名" class="slim" />
+          <input v-model="studentKeyword" placeholder="按学号/姓名搜索" class="slim" @input="searchStudents" aria-label="按学号/姓名搜索" />
+          <input v-model="studentForm.studentNo" placeholder="学号" class="slim" aria-label="学号" />
+          <input v-model="studentForm.name" placeholder="姓名" class="slim" aria-label="姓名" />
           <button @click="createStudent">新增学生</button>
         </div>
         <table>
@@ -211,7 +211,7 @@
         <div class="row section-head">
           <h3>授课关系与选课归属</h3>
           <div class="spacer"></div>
-          <select v-model="selectedClassId" class="slim">
+          <select v-model="selectedClassId" aria-label="选择教学班" class="slim">
             <option value="">选择教学班</option>
             <option v-for="c in classes" :key="c.id" :value="c.id">{{ c.name }}（{{ c.code }}）</option>
           </select>
@@ -220,11 +220,11 @@
         <template v-if="selectedClassId">
           <div class="assign-block">
             <div class="row">
-              <select v-model="assignTeacherId" class="slim">
+              <select v-model="assignTeacherId" aria-label="选择授课教师" class="slim">
                 <option value="">选择教师</option>
                 <option v-for="t in teachers" :key="t.id" :value="t.id">{{ t.name }}（{{ t.staffNo }}）</option>
               </select>
-              <select v-model="assignRole" class="slim tiny">
+              <select v-model="assignRole" aria-label="授课角色" class="slim tiny">
                 <option value="PRIMARY">主讲</option>
                 <option value="ASSISTANT">助教</option>
               </select>
@@ -244,7 +244,7 @@
 
           <div class="assign-block">
             <div class="row">
-              <select v-model="enrollStudentId" class="slim">
+              <select v-model="enrollStudentId" aria-label="选择选课学生" class="slim">
                 <option value="">选择学生</option>
                 <option v-for="s in students" :key="s.id" :value="s.id">{{ s.name }}（{{ s.studentNo }}）</option>
               </select>
@@ -264,6 +264,10 @@
       </div>
     </template>
 
+        <div v-else class="empty">请先选择教学班</div>
+      </div>
+    </template>
+
     <!-- 账号管理（本地合成账号，可多管理员） -->
     <template v-if="tab === 'accounts'">
       <div class="card section">
@@ -272,13 +276,13 @@
           <p class="muted" style="margin: 0;">支持多个管理员；角色任意切换，停用后立即禁止登录。主管理员（bootstrap）启动时自动恢复启用、不可移除</p>
         </div>
         <div class="row" style="margin-bottom: 12px;">
-          <select v-model="acctForm.role" class="slim">
+          <select v-model="acctForm.role" aria-label="账号角色" class="slim">
             <option value="ADMIN">管理员</option>
             <option value="TEACHER">教师</option>
             <option value="STUDENT">学生</option>
           </select>
-          <input v-model="acctForm.loginName" placeholder="登录名" class="slim" />
-          <input v-model="acctForm.password" placeholder="初始密码（至少 8 位）" type="password" class="slim" />
+          <input v-model="acctForm.loginName" placeholder="登录名" class="slim" aria-label="登录名" />
+          <input v-model="acctForm.password" placeholder="初始密码（至少 8 位）" type="password" class="slim" aria-label="初始密码（至少 8 位）" />
           <button @click="createAccount">创建账号</button>
         </div>
         <table>
@@ -294,9 +298,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-    </template>
-        <div v-else class="empty">请先选择教学班</div>
       </div>
     </template>
 
@@ -325,7 +326,7 @@
       </div>
     </template>
 
-    <div v-if="message" class="msg" :class="{ ok: msgOk, bad: !msgOk }">{{ message }}</div>
+    <div v-if="message" role="status" class="msg" :class="{ ok: msgOk, bad: !msgOk }">{{ message }}</div>
   </div>
 </template>
 
@@ -513,12 +514,12 @@ function fmtTime(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '' }
   padding: 8px 18px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--panel);
   color: var(--muted);
   font-weight: 600;
 }
-.tab.active { color: var(--accent); background: var(--accent-soft); border-color: #c7d9ff; }
-.section { padding: 18px 20px; margin-bottom: 18px; }
+.tab.active { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.section { padding: 26px; margin-bottom: 24px; }
 .section-head { margin-bottom: 14px; }
 .section-head h3 { margin: 0; font-size: 16px; }
 .slim { width: auto; }
@@ -573,4 +574,14 @@ tr:last-child td { border-bottom: none; }
 }
 .msg.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #bbe7c9; }
 .msg.bad { background: var(--danger-soft); color: var(--danger); border: 1px solid #fecaca; }
+.tabs { padding-bottom: 10px; gap: 8px; }
+.wiz-block { min-width: 0; padding: 20px; }
+.msg { max-width: calc(100vw - 32px); }
+@media (max-width: 768px) {
+  .tabs { flex-wrap: nowrap; overflow-x: auto; }
+  .tab { white-space: nowrap; flex-shrink: 0; padding: 10px 14px; }
+  .wiz-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .section { padding: 20px; }
+  .section > .row > input, .section > .row > select { flex: 1 1 150px; }
+}
 </style>

@@ -1,12 +1,12 @@
 <template>
   <div class="leaderboard-modal" v-if="visible" @click.self="$emit('close')">
-    <div class="modal-content">
+    <div ref="dialogPanel" class="modal-content" role="dialog" aria-modal="true" aria-label="性能排行榜" tabindex="-1">
       <div class="modal-header">
         <div class="header-left">
           <Icon icon="mdi:trophy" class="trophy-icon" />
           <h3>性能排行榜</h3>
         </div>
-        <button class="close-btn" @click="$emit('close')">
+        <button aria-label="关闭性能排行榜" class="close-btn" @click="$emit('close')">
           <Icon icon="mdi:close" />
         </button>
       </div>
@@ -96,6 +96,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useDialogFocus } from '../composables/useDialogFocus'
 import { api } from '../api'
 
 const props = defineProps({
@@ -168,6 +169,8 @@ function formatDate(dateStr) {
   if (!dateStr) return '-'
   return dateStr.replace('T', ' ').slice(0, 16)
 }
+const dialogPanel = ref(null)
+useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 </script>
 
 <style scoped>
@@ -274,7 +277,7 @@ function formatDate(dateStr) {
 }
 
 .tab-btn.active {
-  background: var(--accent);
+  background: var(--button-bg);
   border-color: var(--accent);
   color: #fff;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
@@ -435,4 +438,5 @@ function formatDate(dateStr) {
     display: none;
   }
 }
+.modal-content:focus { outline: none; }
 </style>

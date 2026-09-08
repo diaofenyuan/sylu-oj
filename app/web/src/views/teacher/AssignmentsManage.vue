@@ -1,12 +1,14 @@
 <template>
   <div>
-    <div class="page-head">
-      <h2>作业管理</h2>
-      <p class="muted">管理已发布作业/考试：修改时间窗口、立即收卷、撤回与重新发布；考试（EXAM）发布后已锁定，
-        修改须经双人审批放行</p>
+    <div class="page-head manage-head"><div><h2>作业管理</h2><p class="muted">调整作业安排，查看各班成绩与完成情况。</p></div><router-link class="button-link" to="/teacher/assignment"><Icon icon="mdi:plus" aria-hidden="true" />布置作业</router-link></div>
+    <div class="page-toolbar">
+      <label class="search-field"><span class="sr-only">搜索已发布作业</span><Icon icon="mdi:magnify" aria-hidden="true" /><input v-model.trim="keyword" type="search" placeholder="搜索作业名称" /></label>
+      <select v-model="modeFilter" aria-label="筛选作业类型"><option value="ALL">全部类型</option><option value="HOMEWORK">普通作业</option><option value="EXAM">正式考试</option></select>
     </div>
+    <p v-if="loading" role="status" class="muted">正在加载作业安排…</p>
+    <p class="manage-note"><Icon icon="mdi:information-outline" aria-hidden="true" />正式考试发布后会锁定，修改需经双人审批。</p>
 
-    <div class="card" v-for="a in items" :key="a.id">
+    <div class="card" v-for="a in filteredItems" :key="a.id">
       <div class="row section-row">
         <h3>#{{ a.id }} {{ a.title }}</h3>
         <span class="chip" :class="a.mode === 'EXAM' ? 'chip-warn' : 'chip-primary'">
@@ -14,25 +16,25 @@
         </span>
         <span class="chip" :class="statusClass(a.status)">{{ statusLabel(a.status) }}</span>
         <div class="spacer"></div>
-        <router-link to="/teacher/assignment"><button class="secondary slim-btn">前往组卷发布</button></router-link>
       </div>
 
-      <table v-if="a.targets.length">
+      <div v-if="a.targets.length" class="table-scroll"><table>
         <thead>
           <tr>
             <th>班级</th><th>发布时间</th><th>截止时间</th><th>窗口</th>
-            <th style="width: 90px;">最多提交</th><th style="width: 210px;">操作</th>
+            <th style="width: 90px;">最多提交</th><th style="min-width: 260px;">操作</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="t in a.targets" :key="t.id">
             <td>{{ className(t.teachingClassId) }}</td>
-            <td><input v-model="t.publishAt" type="datetime-local" /></td>
-            <td><input v-model="t.deadline" type="datetime-local" /></td>
+            <td><input v-model="t.publishAt" :aria-label="a.title + ' ' + className(t.teachingClassId) + '发布时间'" type="datetime-local" /></td>
+            <td><input v-model="t.deadline" :aria-label="a.title + ' ' + className(t.teachingClassId) + '截止时间'" type="datetime-local" /></td>
             <td><span class="chip" :class="winClass(t.window)">{{ winLabel(t.window) }}</span></td>
-            <td><input v-model.number="t.maxSubmissions" type="number" min="1" class="slim" /></td>
+            <td><input v-model.number="t.maxSubmissions" :aria-label="a.title + ' ' + className(t.teachingClassId) + '最大提交次数'" type="number" min="1" class="slim" /></td>
             <td>
               <div class="row-op">
+                <router-link class="grade-link" :to="`/teacher/analytics/${t.id}`">查看成绩</router-link>
                 <button class="mini green" :disabled="saving" @click="saveRules(a, t)">保存</button>
                 <button class="mini warn" :disabled="saving" @click="collect(a, t)">收卷</button>
                 <button class="mini" :disabled="saving" @click="withdraw(a, t)">
@@ -42,7 +44,7 @@
             </td>
           </tr>
         </tbody>
-      </table>
+      </table></div>
       <div v-else class="empty">尚未发布到任何班级</div>
 
       <div v-if="a.mode === 'EXAM' && a.approvals && a.approvals.length" class="approvals">
@@ -68,9 +70,9 @@
       </div>
     </div>
 
-    <div v-if="!loading && !items.length" class="empty">暂无作业，请到「组卷发布」创建</div>
-    <div v-if="msg" class="ok-banner">{{ msg }}</div>
-    <div v-if="errMsg" class="err-banner">
+    <div v-if="!loading && !errMsg && !filteredItems.length" class="empty"><h3>{{ items.length ? '没有匹配的作业' : '还没有发布作业' }}</h3><p>{{ items.length ? '调整搜索关键词或作业类型后重试。' : '点击「布置作业」，从题库选择题目并发布到班级。' }}</p></div>
+    <div v-if="msg" role="status" class="ok-banner">{{ msg }}</div>
+    <div v-if="errMsg" role="alert" class="err-banner">
       {{ errMsg }}
       <template v-if="pendingApproval">
         <button class="secondary slim-btn" @click="requestApproval(pendingApproval)">发起修改审批</button>
@@ -80,10 +82,13 @@
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '../../api'
 
 const items = ref([])
+const keyword = ref('')
+const modeFilter = ref('ALL')
+const filteredItems = computed(() => items.value.filter(a => a.title.toLowerCase().includes(keyword.value.toLowerCase()) && (modeFilter.value === 'ALL' || a.mode === modeFilter.value)))
 const classes = ref([])
 const loading = ref(true)
 const saving = ref(false)
@@ -260,7 +265,8 @@ function fail(e) {
 .slim-btn { padding: 5px 12px; font-size: 13px; }
 .row-op { display: flex; gap: 6px; }
 .mini {
-  background: #fff;
+  background: var(--panel);
+  color: var(--text);
   border: 1px solid var(--border);
   box-shadow: none;
   padding: 4px 10px;
@@ -298,4 +304,10 @@ function fail(e) {
   gap: 12px;
   flex-wrap: wrap;
 }
+.manage-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 20px; }
+.manage-note { display: flex; align-items: flex-start; gap: 7px; margin: 0 0 24px; color: var(--muted); font-size: 12px; }
+.manage-note svg { width: 16px; height: 16px; flex-shrink: 0; margin-top: 2px; }
+.row-op { align-items: center; white-space: nowrap; }
+.grade-link { padding: 8px 4px; font-size: 13px; margin-right: 6px; }
+.table-scroll table { margin-bottom: 0; }
 </style>

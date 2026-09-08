@@ -6,13 +6,14 @@
     </div>
 
     <div class="card">
+      <h3>作业信息</h3>
       <div class="row head-row">
-        <input v-model="title" placeholder="作业标题" class="grow" />
-        <select v-model="mode">
+        <input v-model="title" placeholder="作业标题" class="grow" aria-label="作业标题" />
+        <select v-model="mode" aria-label="作业类型">
           <option value="HOMEWORK">普通作业</option>
           <option value="EXAM">正式考试</option>
         </select>
-        <select v-model="draftPick" @change="loadDraft" class="grow-draft">
+        <select v-model="draftPick" aria-label="载入已有试卷" @change="loadDraft" class="grow-draft">
           <option value="">载入已有试卷…</option>
           <option v-for="a in drafts" :key="a.id" :value="a.id">
             #{{ a.id }} {{ a.title }}（{{ statusLabel(a.status) }}）
@@ -26,17 +27,17 @@
     <div class="card">
       <h3>1. 选择题目</h3>
       <div class="row pick-bar">
-        <select v-model="pickClassId" @change="onPickClass">
+        <select v-model="pickClassId" aria-label="选择授课班级" @change="onPickClass">
           <option value="">选择授课班级</option>
           <option v-for="c in classes" :key="c.teachingClassId" :value="c.teachingClassId">
             {{ c.name }}（{{ c.code }}）
           </option>
         </select>
-        <select v-model="pickBankId" @change="loadPickProblems" :disabled="!pickClassId">
+        <select v-model="pickBankId" aria-label="选择题库" @change="loadPickProblems" :disabled="!pickClassId">
           <option value="">选择题库</option>
           <option v-for="b in banks" :key="b.id" :value="b.id">{{ b.name }}</option>
         </select>
-        <input v-model="pickKeyword" placeholder="搜索编号/标题" class="slim" />
+        <input v-model="pickKeyword" placeholder="搜索编号/标题" class="slim" aria-label="搜索编号/标题" />
         <span class="muted">{{ filteredPick.length }} 道题</span>
       </div>
 
@@ -45,12 +46,12 @@
           <thead><tr><th style="width: 40px;"></th><th>编号</th><th>标题</th><th>语言</th><th>状态</th><th style="width: 130px;">权重</th></tr></thead>
           <tbody>
             <tr v-for="p in filteredPick" :key="p.id" :class="{ picked: pickedIds.has(p.id) }">
-              <td><input type="checkbox" :checked="pickedIds.has(p.id)" @change="togglePick(p)" /></td>
+              <td><input type="checkbox" :aria-label="'选择题目 ' + p.title" :checked="pickedIds.has(p.id)" @change="togglePick(p)" /></td>
               <td class="mono">{{ p.code }}</td>
               <td>{{ p.title }}</td>
               <td class="muted">{{ langLabel(p.languages) }}</td>
               <td><span class="chip" :class="p.status === 'PUBLISHED' ? 'chip-ok' : 'chip-warn'">{{ p.status === 'PUBLISHED' ? '已发布' : '草稿' }}</span></td>
-              <td><input v-if="pickedIds.has(p.id)" v-model="weights[p.id]" type="number" step="0.01" min="0" class="slim" /></td>
+              <td><input v-if="pickedIds.has(p.id)" v-model="weights[p.id]" :aria-label="p.title + '的分值'" type="number" step="0.01" min="0" class="slim" /></td>
             </tr>
           </tbody>
         </table>
@@ -71,7 +72,7 @@
       <div v-if="picked.length" class="picked-summary">
         <span v-for="(p, i) in picked" :key="p.id" class="chip chip-primary">
           {{ p.code }} · {{ weights[p.id] || 0 }}分
-          <button class="chip-x" @click="togglePick(p)">×</button>
+          <button class="chip-x" :aria-label="'移除题目 ' + p.title" @click="togglePick(p)">×</button>
         </span>
       </div>
       <div v-else class="empty">尚未选择题目</div>
@@ -80,7 +81,7 @@
     <div class="card">
       <h3>3. 发布到班级</h3>
       <div class="row pick-bar">
-        <select v-model="targetPick">
+        <select v-model="targetPick" aria-label="选择发布班级">
           <option value="">选择要发布的班级</option>
           <option v-for="c in classes" :key="c.teachingClassId" :value="c.teachingClassId" :disabled="targetClassIds.has(c.teachingClassId)">
             {{ c.name }}（{{ c.code }}）{{ targetClassIds.has(c.teachingClassId) ? ' · 已添加' : '' }}
@@ -102,23 +103,24 @@
         <tbody>
           <tr v-for="(t, i) in targets" :key="t.teachingClassId">
             <td>{{ className(t.teachingClassId) }}</td>
-            <td><input v-model="t.publishAt" type="datetime-local" /></td>
-            <td><input v-model="t.deadline" type="datetime-local" /></td>
-            <td><input v-model="t.maxSubmissions" type="number" min="1" class="slim" /></td>
+            <td><input v-model="t.publishAt" :aria-label="className(t.teachingClassId) + '发布时间'" type="datetime-local" /></td>
+            <td><input v-model="t.deadline" :aria-label="className(t.teachingClassId) + '截止时间'" type="datetime-local" /></td>
+            <td><input v-model="t.maxSubmissions" :aria-label="className(t.teachingClassId) + '最大提交次数'" type="number" min="1" class="slim" /></td>
             <td><button class="danger slim-btn" @click="targets.splice(i, 1)">移除</button></td>
           </tr>
         </tbody>
       </table>
       <div v-else class="empty">尚未添加发布班级</div>
 
+      <p v-if="!canPublish" class="muted publish-hint">发布前，请填写标题、选择题目，将权重分配为 100 分，并添加发布班级。</p>
       <div class="row action-row">
         <button :disabled="!canPublish" @click="saveAndPublish">{{ draftId ? '保存并发布' : '保存草稿并发布' }}</button>
         <button class="secondary" :disabled="!itemsReady" @click="saveDraft">仅保存草稿</button>
       </div>
     </div>
 
-    <div v-if="msg" class="ok-banner">{{ msg }}</div>
-    <div v-if="errMsg" class="err-banner">{{ errMsg }}</div>
+    <div v-if="msg" role="status" class="ok-banner">{{ msg }}</div>
+    <div v-if="errMsg" role="alert" class="err-banner">{{ errMsg }}</div>
   </div>
 </template>
 
@@ -425,5 +427,15 @@ input[type="datetime-local"] { padding: 7px 10px; }
   padding: 10px 14px;
   font-size: 13.5px;
   margin-top: 4px;
+}
+.chip-x { min-height: 28px; min-width: 28px; }
+.publish-hint { font-size: 13px; margin-top: 20px; }
+.action-row { padding-top: 20px; border-top: 1px solid var(--border); }
+@media (max-width: 768px) {
+  .head-row input, .grow { min-width: 0; width: 100%; flex-basis: 100%; }
+  .head-row select { flex: 1; }
+  .pick-bar > input, .pick-bar > select { max-width: 100%; }
+  .uniform-bar > span:first-child { flex-basis: 100%; }
+  .action-row button { flex: 1 1 160px; }
 }
 </style>

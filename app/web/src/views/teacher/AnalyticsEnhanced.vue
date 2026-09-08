@@ -1,5 +1,6 @@
 <template>
   <div class="analytics-enhanced">
+    <router-link to="/teacher/assignments" class="back-link"><Icon icon="mdi:arrow-left" aria-hidden="true" />返回作业管理</router-link>
     <div class="page-head">
       <h2>成绩分析（目标班级 #{{ targetId }}）</h2>
       <p class="muted">班级表现多维统计与成绩导出</p>
@@ -430,7 +431,7 @@ async function exportGrades() {
 }
 
 .stat-card:hover {
-  transform: translateY(-2px);
+  transform: none;
   box-shadow: var(--shadow-md);
 }
 

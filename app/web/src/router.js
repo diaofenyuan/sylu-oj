@@ -1,16 +1,16 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from './views/Login.vue'
-import AdminHome from './views/admin/AdminHome.vue'
-import TeacherClasses from './views/teacher/Classes.vue'
-import TeacherProblemBank from './views/teacher/ProblemBank.vue'
-import TeacherAssignmentEditor from './views/teacher/AssignmentEditor.vue'
-import TeacherAssignmentsManage from './views/teacher/AssignmentsManage.vue'
-import TeacherAnalytics from './views/teacher/Analytics.vue'
-import TeacherAnalyticsEnhanced from './views/teacher/AnalyticsEnhanced.vue'
-import StudentHome from './views/student/StudentHome.vue'
-import StudentAssignment from './views/student/StudentAssignment.vue'
-import StudentPractice from './views/student/StudentPractice.vue'
-import ContestMode from './components/ContestMode.vue'
+const AdminHome = () => import('./views/admin/AdminHome.vue')
+const TeacherClasses = () => import('./views/teacher/Classes.vue')
+const TeacherProblemBank = () => import('./views/teacher/ProblemBank.vue')
+const TeacherAssignmentEditor = () => import('./views/teacher/AssignmentEditor.vue')
+const TeacherAssignmentsManage = () => import('./views/teacher/AssignmentsManage.vue')
+const TeacherAnalytics = () => import('./views/teacher/Analytics.vue')
+const TeacherAnalyticsEnhanced = () => import('./views/teacher/AnalyticsEnhanced.vue')
+const StudentHome = () => import('./views/student/StudentHome.vue')
+const StudentAssignment = () => import('./views/student/StudentAssignment.vue')
+const StudentPractice = () => import('./views/student/StudentPractice.vue')
+const ContestMode = () => import('./components/ContestMode.vue')
 import { getRole, refreshRole } from './auth'
 import { getToken } from './api'
 
@@ -20,18 +20,18 @@ const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/', redirect: '/login' },
-    { path: '/login', component: Login },
-    { path: '/admin', component: AdminHome, meta: { area: 'admin' } },
-    { path: '/teacher/classes', component: TeacherClasses, meta: { area: 'teacher' } },
-    { path: '/teacher/classes/:classId/problems', component: TeacherProblemBank, meta: { area: 'teacher' } },
-    { path: '/teacher/assignment', component: TeacherAssignmentEditor, meta: { area: 'teacher' } },
-    { path: '/teacher/assignments', component: TeacherAssignmentsManage, meta: { area: 'teacher' } },
-    { path: '/teacher/analytics/:targetId', component: TeacherAnalyticsEnhanced, meta: { area: 'teacher' } },
-    { path: '/teacher/analytics/:targetId/classic', component: TeacherAnalytics, meta: { area: 'teacher' } },
-    { path: '/student', component: StudentHome, meta: { area: 'student' } },
-    { path: '/student/practice', component: StudentPractice, meta: { area: 'student' } },
-    { path: '/student/targets/:targetId', component: StudentAssignment, meta: { area: 'student' } },
-    { path: '/student/contest/:contestId', component: ContestMode, props: route => ({ contestId: Number(route.params.contestId) }), meta: { area: 'student' } }
+    { path: '/login', component: Login, meta: { title: '登录' } },
+    { path: '/admin', component: AdminHome, meta: { area: 'admin', title: '管理控制台' } },
+    { path: '/teacher/classes', component: TeacherClasses, meta: { area: 'teacher', title: '授课班级' } },
+    { path: '/teacher/classes/:classId/problems', component: TeacherProblemBank, meta: { area: 'teacher', title: '班级题库' } },
+    { path: '/teacher/assignment', component: TeacherAssignmentEditor, meta: { area: 'teacher', title: '组卷发布' } },
+    { path: '/teacher/assignments', component: TeacherAssignmentsManage, meta: { area: 'teacher', title: '作业管理' } },
+    { path: '/teacher/analytics/:targetId', component: TeacherAnalyticsEnhanced, meta: { area: 'teacher', title: '成绩分析' } },
+    { path: '/teacher/analytics/:targetId/classic', component: TeacherAnalytics, meta: { area: 'teacher', title: '成绩分析' } },
+    { path: '/student', component: StudentHome, meta: { area: 'student', title: '我的作业' } },
+    { path: '/student/practice', component: StudentPractice, meta: { area: 'student', title: '刷题中心' } },
+    { path: '/student/targets/:targetId', component: StudentAssignment, meta: { area: 'student', title: '作业工作区' } },
+    { path: '/student/contest/:contestId', component: ContestMode, props: route => ({ contestId: Number(route.params.contestId) }), meta: { area: 'student', title: '比赛模式' } }
   ]
 })
 
@@ -58,6 +58,11 @@ router.beforeEach(async (to) => {
     return role === 'ADMIN' ? '/admin' : '/teacher/classes'
   }
   return true
+})
+
+// 页面按需加载，登录时不必下载编辑器与管理后台；标题帮助用户定位当前任务。
+router.afterEach((to, from, failure) => {
+  if (!failure) document.title = (to.meta.title || '在线判题系统') + ' · SYLU-OJ'
 })
 
 export default router
