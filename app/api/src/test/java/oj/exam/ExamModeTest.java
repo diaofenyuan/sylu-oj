@@ -191,7 +191,7 @@ class ExamModeTest extends TestSupport {
         judgeResultService.record(new oj.submission.JudgeResultService.ResultCommand(
                 submissionId, "AC", new BigDecimal("100.00"), 12, 300, 1, "agent-1",
                 List.of(new oj.submission.JudgeResultService.TestcaseOutcome(
-                        1, "AC", new BigDecimal("100.00"), 5, 100))));
+                        1, "AC", new BigDecimal("100.00"), 5, 100)), null));
 
         asTeacher(teacherId);
         ExamAppeal appeal = examService.createAppeal(assignmentId, submissionId, "学生申诉");

@@ -155,7 +155,7 @@ class TeacherWorkflowTest extends TestSupport {
 
     private void judge(Long submissionId, String code, String score) {
         judgeResultService.record(new JudgeResultService.ResultCommand(
-                submissionId, code, new BigDecimal(score), 100, 1024, 1, "agent-1", null));
+                submissionId, code, new BigDecimal(score), 100, 1024, 1, "agent-1", null, null));
     }
 
     // ---------------- 教学组织 ----------------
