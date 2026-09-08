@@ -38,7 +38,7 @@
           <span class="chip" :class="winClass(meta.window)">{{ winLabel(meta.window) }}</span>
           <span class="meta-item" v-if="meta.publishAt">发布：{{ fmtTime(meta.publishAt).slice(0, 16) }}</span>
           <span class="meta-item" v-if="meta.deadline">截止：{{ fmtTime(meta.deadline).slice(0, 16) }}</span>
-          <span class="meta-item" v-if="meta.maxSubmissions">已提交 {{ meta.attemptCount ?? 0 }}/{{ meta.maxSubmissions }} 次</span>
+          <span class="meta-item" v-if="meta.maxSubmissions">已提交 {{ attemptCount }}/{{ meta.maxSubmissions }} 次</span>
           <span v-if="meta.window === 'CLOSED'" class="meta-item closed-tip">已收卷，禁止提交（可查看题目与成绩）</span>
         </div>
         <template v-if="selected">
@@ -127,13 +127,17 @@
               {{ running ? '运行中…' : '自测运行' }}
             </button>
             <button class="submit-btn"
-                    :disabled="submitting || !selected || !code.trim() || !canSubmitNow" @click="submit">
+                    :disabled="submitting || !selected || !code.trim() || !canSubmitNow || limitReached" @click="submit">
               <Icon :icon="submitting ? 'mdi:loading' : 'mdi:send'" :class="{ 'spin-icon': submitting }" />
-              {{ submitting ? '提交中…' : canSubmitNow ? '保存并提交' : '窗口未开放' }}
+              {{ submitting ? '提交中…' : problemLoading ? '题目加载中…' : !canSubmitNow ? '窗口未开放' : limitReached ? '次数已用尽' : '保存并提交' }}
             </button>
           </div>
 
           <div v-if="panelOpen" class="rp-body">
+            <p v-if="submissionError" class="st-err" role="alert">{{ submissionError }}</p>
+            <p v-if="statusError" class="st-err" role="alert">
+              {{ statusError }} <button class="mini-btn" :disabled="statusLoading" @click="refreshSubmissionStatus">重试刷新</button>
+            </p>
             <!-- 执行结果 -->
             <template v-if="panel === 'result'">
               <div v-if="resultPhase === 'idle'" class="rp-idle">保存并提交之后,这里将会显示运行结果</div>
@@ -142,17 +146,23 @@
               </div>
               <template v-else>
                 <div class="result-line">
+                  <span class="muted">第 {{ latestResult.attemptNo }} 次提交</span>
                   <span class="chip" :class="stateClass(latestResult.status)">
                     <Icon :icon="getStatusIcon(latestResult.status)" />
                     {{ stateText(latestResult.status) }}
                   </span>
                   <span v-if="latestResult.score !== null" class="result-score">得分 <strong>{{ latestResult.score }}</strong>/100</span>
                   <span v-if="latestResult.timeMs !== null" class="muted">运行时间:{{ latestResult.timeMs }}ms</span>
+                  <span v-if="latestResult.memoryKb != null && latestResult.memoryKb >= 0" class="muted">内存:{{ fmtMem(latestResult.memoryKb) }}</span>
                 </div>
                 <p v-if="latestResult.score !== null && latestResult.score < 100" class="muted result-hint">
                   未全部通过:可通过左侧样例对照输出,或用「自测运行」调试代码
                 </p>
                 <CaseDetails v-if="caseDetails.length" :case-details="caseDetails" />
+                <p v-if="caseDetailsLoading" class="muted">测试点详情加载中…</p>
+                <p v-else-if="caseDetailsError" class="st-err" role="alert">
+                  {{ caseDetailsError }} <button class="mini-btn" @click="loadCaseDetails(selectedSubmissionId)">重试加载详情</button>
+                </p>
                 <ErrorDiagnostics
                   :status="latestResult.status"
                   :time-limit="selected?.timeLimitMs"
@@ -211,8 +221,9 @@
 
             <!-- 提交记录 -->
             <template v-else>
+              <button class="mini-btn" :disabled="statusLoading" @click="refreshSubmissionStatus">{{ statusLoading ? '刷新中…' : '刷新记录' }}</button>
               <table v-if="submissions.length" class="sub-table">
-                <thead><tr><th>#</th><th>状态</th><th>得分</th><th>语言</th><th>耗时</th><th>内存</th><th>提交时间</th></tr></thead>
+                <thead><tr><th>#</th><th>状态</th><th>得分</th><th>语言</th><th>耗时</th><th>内存</th><th>提交时间</th><th>详情</th></tr></thead>
                 <tbody>
                   <tr v-for="s in submissions" :key="s.submissionId">
                     <td>{{ s.attemptNo }}</td>
@@ -227,10 +238,11 @@
                     <td>{{ s.totalTimeMs != null ? s.totalTimeMs + 'ms' : '—' }}</td>
                     <td>{{ s.peakMemoryKb != null && s.peakMemoryKb > 0 ? fmtMem(s.peakMemoryKb) : '—' }}</td>
                     <td class="muted">{{ fmtTime(s.submittedAt) }}</td>
+                    <td><button class="mini-btn" @click="viewSubmission(s)">查看结果</button></td>
                   </tr>
                 </tbody>
               </table>
-              <div v-else class="rp-idle">本题暂无提交记录</div>
+              <div v-else class="rp-idle">{{ statusLoading ? '提交记录加载中…' : '本题暂无提交记录' }}</div>
             </template>
           </div>
         </div>
@@ -305,6 +317,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { createDraftStore } from '../composables/draftStore'
 import { normalizeOutput, selfTestFeedback } from '../composables/selfTestFeedback'
+import { summarizeSubmissions } from '../composables/submissionSummary'
 import { useJudgeStatus } from '../composables/useJudgeStatus'
 import CaseDetails from './CaseDetails.vue'
 import ErrorDiagnostics from './ErrorDiagnostics.vue'
@@ -421,6 +434,18 @@ const drawer = ref(false)
 const language = ref('CPP')
 const code = ref('')
 const submitting = ref(false)
+const submissionError = ref('')
+const statusError = ref('')
+const statusLoading = ref(false)
+const selectedSubmissionId = ref(null)
+const attemptCount = ref(0)
+watch(() => props.meta?.attemptCount, count => { attemptCount.value = count ?? 0 }, { immediate: true })
+const limitReached = computed(() => isAssignment.value && props.meta?.maxSubmissions != null
+  && attemptCount.value >= props.meta.maxSubmissions)
+const pendingRequests = new Map()
+let statusVersion = 0
+let detailsVersion = 0
+let displayedResultKey = ''
 const running = ref(false)
 const panelOpen = ref(true)
 const panel = ref('result')
@@ -436,6 +461,8 @@ const showTemplates = ref(false)
 const showShortcuts = ref(false)
 const showLeaderboard = ref(false)
 const caseDetails = ref([])
+const caseDetailsLoading = ref(false)
+const caseDetailsError = ref('')
 const myUserId = ref(0)
 const draftStatus = ref('草稿仅保存在此浏览器')
 const legacyDraft = ref(null)
@@ -611,26 +638,19 @@ async function loadProblems() {
     if (isAssignment.value) {
       const list = await api(`/student/targets/${props.targetId}/problems`)
       const allSubs = await api(`/student/submissions?assignmentTargetId=${props.targetId}`)
-      const latestByProblem = new Map()
+      const submissionsByProblem = new Map()
       for (const s of allSubs) {
-        const prev = latestByProblem.get(s.problemId)
-        if (!prev || String(s.submittedAt) > String(prev.submittedAt)) latestByProblem.set(s.problemId, s)
+        if (!submissionsByProblem.has(s.problemId)) submissionsByProblem.set(s.problemId, [])
+        submissionsByProblem.get(s.problemId).push(s)
       }
       problems.value = list.map((p, i) => {
-        const last = latestByProblem.get(p.problemId)
-        let status = 'UNATTEMPTED'
-        let best = 0
-        if (last) {
-          status = last.judgeStatus
-          best = last.normalizedScore ?? 0
-          if (best >= 100) status = 'AC'
-        }
+        const summary = summarizeSubmissions(submissionsByProblem.get(p.problemId) ?? [])
         return {
           ...p,
           code: p.code || `P${String(i + 1).padStart(2, '0')}`,
           difficulty: null,
-          status,
-          bestScore: best,
+          status: summary.status,
+          bestScore: summary.bestScore,
           assignmentTargetId: Number(props.targetId),
           timeLimitMs: p.timeLimitMs ?? 10000,
           memoryLimitMb: p.memoryLimitMb ?? 256
@@ -650,6 +670,15 @@ async function loadProblems() {
 
 async function selectProblem(problemId) {
   const version = ++selectionVersion
+  statusVersion++
+  detailsVersion++
+  selectedSubmissionId.value = null
+  displayedResultKey = ''
+  statusError.value = ''
+  statusLoading.value = false
+  submissionError.value = ''
+  caseDetailsError.value = ''
+  caseDetailsLoading.value = false
   problemLoading.value = true
   loadError.value = ''
   selectedId.value = problemId
@@ -688,45 +717,58 @@ async function selectProblem(problemId) {
   }
 }
 
-async function loadSubmissions() {
-  if (!selected.value) return
-  const problemId = selected.value.problemId
-  const list = await api(`/student/submissions?assignmentTargetId=${selected.value.assignmentTargetId}&problemId=${problemId}`)
-  if (selected.value?.problemId !== problemId) return
-  submissions.value = list.slice().reverse()
-}
-
 async function refreshSubmissionStatus() {
   clearPoll()
   if (!selected.value) return
-  const problemId = selected.value.problemId
-  const list = await api(`/student/submissions?assignmentTargetId=${selected.value.assignmentTargetId}&problemId=${problemId}`)
-  if (!selected.value || selected.value.problemId !== problemId) return
-  const latest = list.at(-1)
-  if (!latest) return
-  if (latest.judgeStatus === 'PD') {
-    if (resultPhase.value !== 'idle') resultPhase.value = 'pending'
-    pollTimer = setTimeout(() => { pollTimer = null; refreshSubmissionStatus() }, 2000)
-    return
+  const version = ++statusVersion
+  const problem = selected.value
+  statusLoading.value = true
+  statusError.value = ''
+  try {
+    const list = await api(`/student/submissions?assignmentTargetId=${problem.assignmentTargetId}&problemId=${problem.problemId}`)
+    if (version !== statusVersion) return
+    const summary = summarizeSubmissions(list)
+    submissions.value = summary.ordered.slice().reverse()
+    problem.status = summary.status
+    problem.bestScore = summary.bestScore
+    const item = problems.value.find(item => item.problemId === problem.problemId)
+    if (item) { item.status = summary.status; item.bestScore = summary.bestScore }
+    const displayed = summary.ordered.find(row => row.submissionId === selectedSubmissionId.value) ?? summary.latest
+    if (displayed) displaySubmission(displayed)
+    if (list.some(row => row.judgeStatus === 'PD')) {
+      pollTimer = setTimeout(() => { pollTimer = null; refreshSubmissionStatus() }, 2000)
+    }
+  } catch (error) {
+    if (version === statusVersion) statusError.value = `提交记录/结果加载失败：${error.message}。可重试刷新，无需再次提交代码。`
+  } finally {
+    if (version === statusVersion) statusLoading.value = false
   }
+}
+
+function displaySubmission(submission) {
+  selectedSubmissionId.value = submission.submissionId
+  const key = JSON.stringify(submission)
+  if (displayedResultKey === key) return
+  displayedResultKey = key
   latestResult.value = {
-    status: latest.judgeStatus,
-    score: latest.normalizedScore ?? null,
-    timeMs: latest.totalTimeMs ?? null
+    attemptNo: submission.attemptNo,
+    status: submission.judgeStatus,
+    score: submission.normalizedScore ?? null,
+    timeMs: submission.totalTimeMs ?? null,
+    memoryKb: submission.peakMemoryKb ?? null
   }
-  if (resultPhase.value === 'pending' || latest.judgeStatus === 'AC') {
-    resultPhase.value = 'done'
-    panelOpen.value = true
-  }
+  resultPhase.value = submission.judgeStatus === 'PD' ? 'pending' : 'done'
   caseDetails.value = []
-  if (latest.judgeStatus !== 'PD') loadCaseDetails(latest.submissionId)
-  selected.value.status = latest.judgeStatus
-  if (latest.judgeStatus === 'AC') {
-    selected.value.bestScore = 100
-    const item = problems.value.find(problem => problem.problemId === problemId)
-    if (item) { item.status = 'AC'; item.bestScore = 100 }
-  }
-  loadSubmissions()
+  caseDetailsError.value = ''
+  detailsVersion++
+  caseDetailsLoading.value = false
+  if (submission.judgeStatus !== 'PD') loadCaseDetails(submission.submissionId)
+}
+
+function viewSubmission(submission) {
+  displaySubmission(submission)
+  panel.value = 'result'
+  panelOpen.value = true
 }
 
 function clearPoll() {
@@ -735,10 +777,16 @@ function clearPoll() {
 
 async function loadCaseDetails(submissionId) {
   if (!submissionId) return
+  const version = ++detailsVersion
+  caseDetailsLoading.value = true
+  caseDetailsError.value = ''
   try {
-    caseDetails.value = await api(`/student/submissions/${submissionId}/testcases`)
-  } catch {
-    caseDetails.value = []
+    const details = await api(`/student/submissions/${submissionId}/testcases`)
+    if (version === detailsVersion) caseDetails.value = details
+  } catch (error) {
+    if (version === detailsVersion) caseDetailsError.value = `测试点详情加载失败：${error.message}`
+  } finally {
+    if (version === detailsVersion) caseDetailsLoading.value = false
   }
 }
 
@@ -759,27 +807,36 @@ async function ensureUserId() {
 }
 
 async function submit() {
-  if (!selected.value || !code.value.trim() || !canSubmitNow.value) return
+  if (submitting.value || !selected.value || !code.value.trim() || !canSubmitNow.value || limitReached.value) return
   saveDraft()
+  const version = selectionVersion
+  const problem = selected.value
+  const request = { assignmentTargetId: problem.assignmentTargetId, problemId: problem.problemId, language: language.value, code: code.value }
+  const key = JSON.stringify(request)
+  // 网络中断后重试相同代码复用幂等键，避免服务端已接收却再次消耗提交次数。
+  if (!pendingRequests.has(key)) pendingRequests.set(key, crypto.randomUUID())
   submitting.value = true
+  submissionError.value = ''
   try {
-    await api('/student/submissions', {
+    const accepted = await api('/student/submissions', {
       method: 'POST',
-      body: {
-        assignmentTargetId: selected.value.assignmentTargetId,
-        problemId: selected.value.problemId,
-        language: language.value,
-        code: code.value,
-        idempotencyKey: crypto.randomUUID()
-      }
+      body: { ...request, idempotencyKey: pendingRequests.get(key) }
     })
-    selected.value.status = 'PD'
-    const item = problems.value.find(problem => problem.problemId === selected.value.problemId)
-    if (item) item.status = 'PD'
+    pendingRequests.delete(key)
+    if (isAssignment.value) attemptCount.value = Math.max(attemptCount.value, accepted.attemptNo)
+    const item = problems.value.find(item => item.problemId === problem.problemId)
+    if (item && item.status !== 'AC') item.status = accepted.judgeStatus
+    if (version !== selectionVersion) return
+    selectedSubmissionId.value = accepted.submissionId
+    displaySubmission(accepted)
     panel.value = 'result'
     panelOpen.value = true
-    resultPhase.value = 'pending'
     await refreshSubmissionStatus()
+  } catch (error) {
+    if (version === selectionVersion) {
+      submissionError.value = `提交未确认：${error.message}。代码已保留，可重试提交。`
+      panelOpen.value = true
+    }
   } finally {
     submitting.value = false
   }
@@ -838,7 +895,7 @@ function openPanel(key) {
   if (key === 'discussion') ensureUserId()
   if (panel.value === key && key !== 'selftest') return
   panel.value = key
-  if (key === 'submissions') loadSubmissions()
+  if (key === 'submissions') refreshSubmissionStatus()
 }
 
 function runFromButton() {
@@ -873,6 +930,13 @@ function startDrag(event) {
 
 function onKeydown(event) {
   const mod = event.ctrlKey || event.metaKey
+  const key = event.key.toLowerCase()
+  const handled = mod && (['enter', 's', '/'].includes(key)
+    || (event.altKey ? ['r', 't'].includes(key) : ['[', ']'].includes(key)))
+  if (!handled) return
+  // 先于编辑器消费工作台快捷键，避免 Ctrl+Enter 同时插入空行并提交。
+  event.preventDefault()
+  event.stopPropagation()
   if (mod && event.key === 'Enter') {
     event.preventDefault()
     submit()
@@ -905,13 +969,15 @@ function onKeydown(event) {
 
 onMounted(() => {
   loadProblems()
-  window.addEventListener('keydown', onKeydown)
+  window.addEventListener('keydown', onKeydown, true)
 })
 onBeforeUnmount(() => {
   selectionVersion++
   runVersion++
+  statusVersion++
+  detailsVersion++
   clearPoll()
-  window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('keydown', onKeydown, true)
   editorView?.destroy()
   editorView = null
 })

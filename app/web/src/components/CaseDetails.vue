@@ -84,7 +84,7 @@ const expanded = ref(false)
 
 const cases = computed(() => {
   if (!props.caseDetails || props.caseDetails.length === 0) return []
-  return props.caseDetails.sort((a, b) => a.order - b.order)
+  return [...props.caseDetails].sort((a, b) => a.order - b.order)
 })
 
 const passedCount = computed(() => cases.value.filter(c => c.status === 'AC').length)

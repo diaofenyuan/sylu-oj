@@ -2,6 +2,7 @@
 export function useJudgeStatus() {
   // 状态图标映射
   const statusIcons = {
+    UNATTEMPTED: 'mdi:circle-outline',
     AC: 'mdi:check-circle',
     WA: 'mdi:close-circle',
     TLE: 'mdi:timer-alert',
@@ -17,6 +18,7 @@ export function useJudgeStatus() {
 
   // 状态文本映射
   const statusText = {
+    UNATTEMPTED: '未开始',
     AC: '通过',
     WA: '答案错误',
     TLE: '超时',
