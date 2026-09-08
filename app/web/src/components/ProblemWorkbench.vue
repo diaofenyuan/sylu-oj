@@ -48,7 +48,7 @@
             </div>
             <div class="pr-meta">
               <DifficultyBadge v-if="selected.difficulty" :difficulty="selected.difficulty" />
-              <span class="meta-item">时间限制:{{ Math.round(selected.timeLimitMs / 1000) }}s</span>
+              <span class="meta-item">时间限制:{{ selected.timeLimitMs / 1000 }}s</span>
               <span class="meta-item">空间限制:{{ selected.memoryLimitMb }}M</span>
               <span class="meta-item">最佳:{{ selected.bestScore }} 分</span>
             </div>
@@ -645,6 +645,8 @@ async function loadProblems() {
       }
       problems.value = list.map((p, i) => {
         const summary = summarizeSubmissions(submissionsByProblem.get(p.problemId) ?? [])
+        let config = {}
+        try { config = JSON.parse(p.judgeConfig || '{}') ?? {} } catch { /* 兼容缺少配置的旧快照 */ }
         return {
           ...p,
           code: p.code || `P${String(i + 1).padStart(2, '0')}`,
@@ -652,8 +654,8 @@ async function loadProblems() {
           status: summary.status,
           bestScore: summary.bestScore,
           assignmentTargetId: Number(props.targetId),
-          timeLimitMs: p.timeLimitMs ?? 10000,
-          memoryLimitMb: p.memoryLimitMb ?? 256
+          timeLimitMs: p.timeLimitMs ?? config.timeLimitMs ?? 10000,
+          memoryLimitMb: p.memoryLimitMb ?? config.memoryLimitMb ?? 256
         }
       })
       if (problems.value.length) await selectProblem(problems.value[0].problemId)

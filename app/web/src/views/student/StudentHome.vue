@@ -14,6 +14,9 @@
       </router-link>
     </div>
 
+    <p v-if="error" role="alert" class="load-error">{{ error }}</p>
+    <button class="secondary" :disabled="loading" @click="refresh">{{ loading ? '加载中…' : '刷新作业' }}</button>
+
     <div class="card asg-card" v-for="a in assignments" :key="a.targetId">
       <div class="row">
         <span class="chip" :class="a.mode === 'EXAM' ? 'chip-warn' : 'chip-primary'">
@@ -39,16 +42,14 @@
       </div>
     </div>
 
-    <div v-if="!loading && !assignments.length" class="empty">暂无已发布的作业</div>
+    <div v-if="!loading && !error && !assignments.length" class="empty">暂无已发布的作业</div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
-import { api } from '../../api'
+import { useStudentAssignments } from '../../composables/useStudentAssignments'
 
-const assignments = ref([])
-const loading = ref(true)
+const { assignments, loading, error, refresh } = useStudentAssignments()
 
 function fmt(s) {
   return s ? s.replace('T', ' ').slice(0, 16) : ''
@@ -60,16 +61,10 @@ function winClass(w) {
   return ({ NOT_STARTED: 'chip-warn', OPEN: 'chip-ok', CLOSED: 'chip-muted' })[w] || 'chip-muted'
 }
 
-onMounted(async () => {
-  try {
-    assignments.value = await api('/student/assignments')
-  } finally {
-    loading.value = false
-  }
-})
 </script>
 
 <style scoped>
+.load-error { color: var(--danger); }
 .asg-card { padding: 18px 20px; }
 .asg-info { display: flex; flex-direction: column; line-height: 1.45; }
 .asg-info strong { font-size: 15px; }
