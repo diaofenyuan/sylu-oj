@@ -87,6 +87,7 @@ func main() {
 	defer stop()
 
 	log.Printf("INFO agent=%s sandbox=%s gateway=%s 就绪", agentID, runner.Name(), gatewayURL)
+	claimer := &workClaimer{client: client}
 	for {
 		select {
 		case <-ctx.Done():
@@ -94,19 +95,13 @@ func main() {
 			return
 		default:
 		}
-		task, err := client.ClaimTask(25)
+		task, run, err := claimer.claim()
 		if err != nil {
 			log.Printf("WARN 领取任务失败: %v", err)
 			sleepCtx(ctx, 3*time.Second)
 			continue
 		}
 		if task == nil {
-			run, err := client.ClaimRunTask(25)
-			if err != nil {
-				log.Printf("WARN 领取自测运行任务失败: %v", err)
-				sleepCtx(ctx, 3*time.Second)
-				continue
-			}
 			if run == nil {
 				continue
 			}
