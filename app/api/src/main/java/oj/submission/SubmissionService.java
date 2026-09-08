@@ -12,6 +12,7 @@ import oj.shared.ErrorCode;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Isolation;
 
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -67,7 +68,7 @@ public class SubmissionService {
     /**
      * 学生提交。幂等键重复时返回既有提交（不消耗次数）。
      */
-    @Transactional
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public Submission submit(SubmitCommand command) {
         var user = accessGuard.requireStudent();
         Long studentId = user.studentId();
@@ -89,7 +90,9 @@ public class SubmissionService {
         if (!target.isOpenAt(now)) {
             throw new ApiException(ErrorCode.WINDOW_CLOSED);
         }
-        // 幂等键防重放：同键请求返回既有提交，不再消耗次数
+        // 先串行化同一学生的提交；READ_COMMITTED 保证等待行锁后能读到刚提交的幂等记录。
+        SubmissionCounter counter = lockOrCreateCounter(command.assignmentTargetId(), studentId);
+        // 幂等检查必须在次数上限检查之前，允许已达上限的请求安全重试。
         Submission existing = submissionRepository
                 .findByAssignmentTargetIdAndProblemIdAndStudentIdAndIdempotencyKey(
                         command.assignmentTargetId(), command.problemId(), studentId,
@@ -114,8 +117,6 @@ public class SubmissionService {
         if (!allowed) {
             throw new ApiException(ErrorCode.LANGUAGE_NOT_ALLOWED);
         }
-        // 原子计数：先幂等创建计数行（REQUIRES_NEW），再以行锁校验上限并递增。
-        SubmissionCounter counter = lockOrCreateCounter(command.assignmentTargetId(), studentId);
         if (counter.getAttemptCount() >= target.getMaxSubmissions()) {
             throw new ApiException(ErrorCode.SUBMISSION_LIMIT_EXCEEDED);
         }
@@ -154,8 +155,8 @@ public class SubmissionService {
     }
 
     private SubmissionCounter lockOrCreateCounter(Long targetId, Long studentId) {
-        // 快路径：行已存在则直接加行锁，避免对不存在行加 gap 锁引发死锁
-        if (counterRepository.findById(new SubmissionCounter.Pk(targetId, studentId)).isPresent()) {
+        // 仅检查存在性，不能提前加载实体，否则加锁后仍可能读取一级缓存中的旧计数。
+        if (counterRepository.existsById(new SubmissionCounter.Pk(targetId, studentId))) {
             return counterRepository.lockCounter(targetId, studentId)
                     .orElseThrow(() -> new ApiException(ErrorCode.INTERNAL_ERROR));
         }
