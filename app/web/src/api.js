@@ -13,7 +13,7 @@ export function clearToken() {
   localStorage.removeItem(TOKEN_KEY)
 }
 
-export async function api(path, { method = 'GET', body, token } = {}) {
+export async function api(path, { method = 'GET', body, token, responseType = 'json' } = {}) {
   const headers = { 'Content-Type': 'application/json' }
   const t = token || getToken()
   if (t) headers['Authorization'] = 'Bearer ' + t
@@ -26,6 +26,7 @@ export async function api(path, { method = 'GET', body, token } = {}) {
     clearToken()
     throw new Error('未认证或登录已过期')
   }
+  if (res.ok && responseType === 'blob') return res.blob()
   const text = await res.text()
   let data = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }

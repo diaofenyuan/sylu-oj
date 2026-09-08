@@ -5,6 +5,8 @@
       <p class="muted">班级表现多维统计与成绩导出</p>
     </div>
 
+    <p v-if="loading" role="status">成绩加载中…</p>
+    <p v-if="loadError" role="alert">{{ loadError }} <button @click="loadAnalytics">重新加载</button></p>
     <div class="card">
       <h3>班级状态分布</h3>
       <div class="dist">
@@ -32,7 +34,7 @@
         </tr>
       </tbody>
     </table>
-    <div v-if="!rows.length" class="empty">暂无成绩数据</div>
+    <div v-if="!loading && !loadError && !rows.length" class="empty">暂无成绩数据</div>
 
     <div class="card export-card">
       <h3>导出成绩</h3>
@@ -40,68 +42,67 @@
         <select v-model="format"><option value="XLSX">XLSX</option><option value="CSV">CSV(ZIP)</option></select>
         <input v-model="studentNo" placeholder="学号筛选（可选）" />
         <input v-model="nameKeyword" placeholder="姓名关键词（可选）" />
-        <button @click="exportGrades">发起导出</button>
-        <button v-if="downloadToken" class="secondary" @click="download">下载文件</button>
+        <button :disabled="exporting || downloading || loading || !!loadError" @click="exportGrades">{{ exporting ? '导出中…' : '发起导出' }}</button>
+        <button v-if="canDownload" :disabled="downloading" class="secondary" @click="download">{{ downloading ? '下载中…' : '下载文件' }}</button>
       </div>
       <p v-if="exportStatus" class="muted status">导出状态：{{ exportStatus }}</p>
+      <p v-if="exportError" role="alert">{{ exportError }}</p>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
-import { api, getToken } from '../../api'
+import { api } from '../../api'
+import { useGradeExport } from '../../composables/useGradeExport'
 
 const route = useRoute()
-const targetId = route.params.targetId
+const targetId = computed(() => route.params.targetId)
 const rows = ref([])
 const classDist = ref({})
 const format = ref('XLSX')
 const studentNo = ref('')
 const nameKeyword = ref('')
-const exportStatus = ref('')
-const downloadToken = ref('')
-let exportId = null
+const { exportStatus, exportError, exporting, downloading, canDownload, exportGrades: startExport, download, reset: resetExport } = useGradeExport()
+const loadError = ref('')
+const loading = ref(false)
+let loadSequence = 0
 
 function distOf(d) {
   if (!d) return ''
   return Object.entries(d).map(([k, v]) => `${k}:${v}`).join(', ')
 }
 
-onMounted(async () => {
-  const data = await api(`/teacher/analytics/targets/${targetId}`)
-  rows.value = data.rows
-  classDist.value = data.classStatusDistribution
-})
-
-async function exportGrades() {
-  const res = await api('/teacher/exports', {
-    method: 'POST',
-    body: {
-      assignmentTargetId: Number(targetId), format: format.value,
-      filterStudentNo: studentNo.value || null, filterNameKeyword: nameKeyword.value || null
-    }
-  })
-  exportId = res.taskId
-  exportStatus.value = res.status
-  pollStatus()
-}
-
-async function pollStatus() {
-  const res = await api(`/teacher/exports/${exportId}`)
-  exportStatus.value = res.status
-  if (res.status === 'READY') {
-    const t = await api(`/teacher/exports/${exportId}/download-token`, { method: 'POST' })
-    downloadToken.value = t.token
-  } else if (res.status === 'QUEUED' || res.status === 'GENERATING') {
-    setTimeout(pollStatus, 1000)
+async function loadAnalytics() {
+  const current = ++loadSequence
+  rows.value = []
+  classDist.value = {}
+  loadError.value = ''
+  loading.value = true
+  try {
+    const data = await api(`/teacher/analytics/targets/${targetId.value}`)
+    if (current !== loadSequence) return
+    rows.value = data.rows
+    classDist.value = data.classStatusDistribution
+  } catch (err) {
+    if (current === loadSequence) loadError.value = err.message || '成绩加载失败'
+  } finally {
+    if (current === loadSequence) loading.value = false
   }
 }
 
-function download() {
-  const token = downloadToken.value
-  window.open(`/api/teacher/exports/download?token=${token}`, '_blank')
+watch(targetId, () => {
+  resetExport()
+  loadAnalytics()
+}, { immediate: true })
+onBeforeUnmount(() => { loadSequence++ })
+
+async function exportGrades() {
+  await startExport({
+    assignmentTargetId: Number(targetId.value), format: format.value,
+    filterStudentNo: studentNo.value || null, filterNameKeyword: nameKeyword.value || null
+  })
 }
 </script>
 
