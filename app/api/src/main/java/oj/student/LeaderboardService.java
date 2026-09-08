@@ -8,6 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Comparator;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -66,21 +69,26 @@ public class LeaderboardService {
                 .filter(sr -> sr != null)
                 .collect(Collectors.toList());
 
-        // 按时间排序（取最快的）
-        List<LeaderboardEntry> byTime = submissions.stream()
-                .sorted((a, b) -> Long.compare(a.result.getTotalTimeMs(), b.result.getTotalTimeMs()))
-                .limit(limit)
-                .map(sr -> toEntry(sr.submission, sr.result))
-                .collect(Collectors.toList());
-
-        // 按内存排序（取最小的）
-        List<LeaderboardEntry> byMemory = submissions.stream()
-                .sorted((a, b) -> Long.compare(a.result.getPeakMemoryKb(), b.result.getPeakMemoryKb()))
-                .limit(limit)
-                .map(sr -> toEntry(sr.submission, sr.result))
-                .collect(Collectors.toList());
+        // 两个榜单分别选优，同一学生的最快提交不一定也是最省内存的提交。
+        List<LeaderboardEntry> byTime = rank(submissions, limit, false);
+        List<LeaderboardEntry> byMemory = rank(submissions, limit, true);
 
         return new LeaderboardResponse(byTime, byMemory);
+    }
+
+    private List<LeaderboardEntry> rank(List<SubmissionWithResult> submissions, int limit, boolean byMemory) {
+        Set<Long> students = new HashSet<>();
+        return submissions.stream()
+                // 内存为 0 或负数表示指标不可用，不能将其作为最省内存；0ms 是有效耗时。
+                .filter(sr -> byMemory ? sr.result.getPeakMemoryKb() > 0 : sr.result.getTotalTimeMs() >= 0)
+                .sorted(Comparator.comparingLong((SubmissionWithResult sr) -> byMemory
+                                ? sr.result.getPeakMemoryKb() : sr.result.getTotalTimeMs())
+                        .thenComparing(sr -> sr.submission.getCreatedAt())
+                        .thenComparing(sr -> sr.submission.getId()))
+                .filter(sr -> students.add(sr.submission.getStudentId()))
+                .limit(limit)
+                .map(sr -> toEntry(sr.submission, sr.result))
+                .toList();
     }
 
     private LeaderboardEntry toEntry(Submission submission, JudgeResult result) {

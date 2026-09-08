@@ -37,6 +37,7 @@
         <div v-else-if="error" class="error-state">
           <Icon icon="mdi:alert-circle" />
           {{ error }}
+          <button class="tab-btn" @click="reload++">重试加载</button>
         </div>
 
         <div v-else class="leaderboard-list">
@@ -108,6 +109,7 @@ const activeTab = ref('time')
 const loading = ref(false)
 const error = ref(null)
 const leaderboardData = ref(null)
+const reload = ref(0)
 
 const currentList = computed(() => {
   if (!leaderboardData.value) return []
@@ -116,24 +118,24 @@ const currentList = computed(() => {
     : leaderboardData.value.byMemory
 })
 
-watch(() => props.visible, (visible) => {
-  if (visible && props.problemId) {
-    loadLeaderboard()
-  }
-})
-
-async function loadLeaderboard() {
-  loading.value = true
+watch([() => props.visible, () => props.problemId, reload], async ([visible, problemId], _, onCleanup) => {
+  // 切题或关闭后忽略旧请求，避免其他题目的排行覆盖当前题目。
+  let active = true
+  onCleanup(() => { active = false })
+  leaderboardData.value = null
   error.value = null
+  loading.value = false
+  if (!visible || !problemId) return
+  loading.value = true
   try {
-    leaderboardData.value = await api(`/student/problems/${props.problemId}/leaderboard?limit=50`)
+    const data = await api(`/student/problems/${problemId}/leaderboard?limit=50`)
+    if (active) leaderboardData.value = data
   } catch (err) {
-    error.value = '加载排行榜失败'
-    console.error(err)
+    if (active) error.value = err.message || '加载排行榜失败'
   } finally {
-    loading.value = false
+    if (active) loading.value = false
   }
-}
+}, { immediate: true })
 
 function getRankClass(index) {
   if (index === 0) return 'rank-1st'
@@ -155,6 +157,7 @@ function formatLanguage(lang) {
 }
 
 function formatMemory(kb) {
+  if (kb == null || kb <= 0) return '—'
   if (kb >= 1024) {
     return (kb / 1024).toFixed(1) + 'MB'
   }
