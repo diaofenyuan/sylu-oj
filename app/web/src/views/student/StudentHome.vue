@@ -1,7 +1,7 @@
 <template>
   <div>
     <div class="page-head home-head">
-      <div><h2>我的作业</h2><p class="muted">安排好每一次练习，循序渐进地解决问题。</p></div>
+      <div><h2>我的作业</h2><p class="muted">查看课程作业、提交记录与截止时间。</p></div>
       <router-link class="button-link" to="/student/practice"><Icon icon="mdi:code-braces" aria-hidden="true" />开始刷题</router-link>
     </div>
     <dl class="assignment-overview" aria-label="作业概览">
@@ -25,7 +25,7 @@
         </div>
         <div class="asg-action"><span class="attempts">已提交 <strong>{{ a.attemptCount }}</strong> / {{ a.maxSubmissions }} 次</span>
           <button v-if="a.window === 'NOT_STARTED'" class="secondary" disabled>等待开始</button>
-          <router-link v-else class="button-link" :class="{ secondary: a.window === 'CLOSED' }" :to="`/student/targets/${a.targetId}`">{{ a.window === 'CLOSED' ? '查看作业' : a.attemptCount > 0 ? '继续作答' : '开始作答' }}<Icon icon="mdi:arrow-right" aria-hidden="true" /></router-link>
+          <router-link v-else class="button-link secondary" :to="`/student/targets/${a.targetId}`">{{ a.window === 'CLOSED' ? '查看作业' : a.attemptCount > 0 ? '继续作答' : '开始作答' }}<Icon icon="mdi:arrow-right" aria-hidden="true" /></router-link>
         </div>
       </article>
     </div>
@@ -80,8 +80,8 @@ function winClass(value) { return ({ NOT_STARTED: 'chip-warn', OPEN: 'chip-ok', 
 .assignment-row:first-of-type { border-radius: var(--radius) var(--radius) 0 0; }
 .assignment-row:last-of-type { border-bottom: 1px solid var(--border); border-radius: 0 0 var(--radius) var(--radius); }
 .assignment-row:only-of-type { border-radius: var(--radius); }
-.assignment-icon { width: 46px; height: 52px; flex-shrink: 0; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); border-radius: 12px; }
-.assignment-icon.exam { color: var(--warn); background: var(--warn-soft); }
+.assignment-icon { width: 46px; height: 52px; flex-shrink: 0; display: grid; place-items: center; background: var(--panel-2); color: var(--muted); border-radius: 8px; }
+.assignment-icon.exam { color: var(--muted); }
 .assignment-icon svg { width: 23px; height: 23px; }
 .asg-info { flex: 1; min-width: 0; }
 .asg-labels { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }

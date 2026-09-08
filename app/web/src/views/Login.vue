@@ -6,19 +6,19 @@
     </header>
     <div class="landing-body">
       <section class="hero" aria-labelledby="welcome-title">
-        <h1 id="welcome-title">让每一次练习，<br />都有进步。</h1>
-        <p class="lead">从第一行代码，到独立解决问题。<br />在这里，专注思考，让反馈陪伴学习。</p>
-        <div class="features">
-          <div><span class="feature-number">01</span><div><h3>练习有方向</h3><p>班级作业与自主刷题，学习节奏由你掌握。</p></div></div>
-          <div><span class="feature-number">02</span><div><h3>提交有反馈</h3><p>在线编写、自测与评测，每一步都有清晰结果。</p></div></div>
-          <div><span class="feature-number">03</span><div><h3>教学更轻松</h3><p>管理题库、布置作业、分析成绩，一处完成。</p></div></div>
-        </div>
-        <div class="languages"><span>多语言，同样专注</span><div>C <span>/</span> C++ <span>/</span> Java <span>/</span> Python</div></div>
+        <p class="hero-label">SYLU-OJ · 在线判题平台</p>
+        <h1 id="welcome-title">程序设计<br />在线教学平台</h1>
+        <p class="lead">课程作业、在线编程与成绩管理。<br />为日常教学与自主练习提供统一入口。</p>
+        <dl class="features">
+          <div><dt>学生</dt><dd>完成课程作业，练习编程题，查看评测结果。</dd></div>
+          <div><dt>教师</dt><dd>维护班级题库，布置作业，查看学习情况。</dd></div>
+        </dl>
+        <div class="languages"><span>支持的编程语言</span><div>C <span>/</span> C++ <span>/</span> Java <span>/</span> Python</div></div>
       </section>
       <section class="login-side" aria-labelledby="login-title">
         <div class="login-card">
-          <h2 id="login-title">欢迎回来</h2>
-          <p class="card-sub">登录账号，继续你的学习与教学。</p>
+          <h2 id="login-title">账号登录</h2>
+          <p class="card-sub">请使用学校分配的账号登录。</p>
           <form @submit.prevent="submit" :aria-busy="loading">
             <label for="login-name">账号</label>
             <input id="login-name" v-model.trim="loginName" placeholder="请输入学校分配的账号" autocomplete="username" required :disabled="loading" :aria-describedby="error ? 'login-error' : undefined" />
@@ -40,7 +40,7 @@
         </div>
       </section>
     </div>
-    <footer class="landing-foot">SYLU-OJ · 专注编程，让学习发生</footer>
+    <footer class="landing-foot">SYLU-OJ · 程序设计教学与实践</footer>
   </div>
 </template>
 
@@ -80,32 +80,32 @@ async function submit() {
 
 <style scoped>
 .landing { min-height: 100dvh; display: flex; flex-direction: column; background: var(--panel); }
-.landing-top { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1344px; margin: 0 auto; padding: 28px 48px; }
+.landing-top { display: flex; align-items: center; justify-content: space-between; width: 100%; max-width: 1248px; margin: 0 auto; padding: 28px 48px; border-bottom: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 700; }
-.logo { width: 38px; height: 38px; display: grid; place-items: center; background: var(--button-bg); color: #fff; border-radius: 11px; font-size: 15px; letter-spacing: -1px; }
+.logo { width: 38px; height: 38px; display: grid; place-items: center; background: var(--text); color: var(--panel); border-radius: 7px; font-size: 15px; letter-spacing: -1px; }
 .brand-suffix { color: var(--muted); font-weight: 450; }
 .top-actions { display: flex; align-items: center; gap: 20px; }
 .platform-name { color: var(--muted); font-size: 13px; }
-.landing-body { flex: 1; width: 100%; max-width: 1344px; padding: 8px 48px 24px; margin: 0 auto; display: grid; grid-template-columns: 1.08fr 1fr; gap: 72px; align-items: stretch; }
-.hero { background: #152b50; color: #f5f8ff; border-radius: 22px; padding: clamp(36px, 4vw, 60px); display: flex; flex-direction: column; }
-.hero h1 { margin: 0 0 20px; font-size: clamp(34px, 3.2vw, 48px); line-height: 1.42; letter-spacing: -0.045em; font-weight: 650; }
-.lead { color: #becce2; font-size: 15px; line-height: 1.9; margin: 0 0 36px; }
-.features { display: grid; gap: 22px; }
-.features > div { display: flex; align-items: flex-start; gap: 18px; }
-.feature-number { font: 13px/1.8 Consolas, monospace; color: #9fbbee; padding-top: 1px; }
-.features h3 { font-size: 15px; font-weight: 550; margin: 0 0 5px; }
-.features p { color: #becce2; font-size: 13px; line-height: 1.7; margin: 0; }
-.languages { border-top: 1px solid #3b4f6e; margin-top: 38px; padding-top: 22px; display: flex; flex-direction: column; gap: 8px; }
-.languages > span { color: #becce2; font-size: 12px; }
-.languages > div { font: 15px/1.6 Consolas, monospace; }
-.languages div span { color: #768caa; margin: 0 10px; }
-.login-side { display: flex; align-items: center; justify-content: center; }
-.login-card { width: 100%; max-width: 370px; padding: 32px 0; }
-.login-card h2 { font-size: 30px; margin: 0 0 10px; letter-spacing: -0.03em; }
+.landing-body { flex: 1; width: 100%; max-width: 1248px; padding: 64px 48px; margin: 0 auto; display: grid; grid-template-columns: 1.15fr 1fr; gap: 64px; align-items: center; }
+.hero { padding: 12px 0; display: flex; flex-direction: column; }
+.hero-label { color: var(--accent); font-size: 12px; font-weight: 600; letter-spacing: 0.06em; margin: 0 0 24px; }
+.hero h1 { margin: 0 0 24px; font-size: clamp(36px, 3.5vw, 48px); line-height: 1.4; letter-spacing: -0.025em; font-weight: 600; }
+.lead { color: var(--muted); font-size: 15px; line-height: 1.9; margin: 0 0 36px; }
+.features { margin: 0; border-top: 1px solid var(--border); }
+.features > div { display: flex; gap: 24px; padding: 17px 0; border-bottom: 1px solid var(--border); }
+.features dt { flex-shrink: 0; font-size: 13px; font-weight: 600; }
+.features dd { color: var(--muted); font-size: 13px; line-height: 1.7; margin: 0; }
+.languages { margin-top: 28px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+.languages > span { color: var(--muted); font-size: 12px; }
+.languages > div { font: 13px/1.6 Consolas, monospace; }
+.languages div span { color: var(--border-strong); margin: 0 10px; }
+.login-side { display: flex; align-items: center; justify-content: flex-end; border-left: 1px solid var(--border); padding-left: 56px; }
+.login-card { width: 100%; max-width: 360px; padding: 20px 0; }
+.login-card h2 { font-size: 26px; margin: 0 0 10px; letter-spacing: -0.03em; }
 .card-sub { color: var(--muted); margin: 0 0 36px; font-size: 14px; }
 form { display: flex; flex-direction: column; }
 form label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 9px; }
-form input { width: 100%; min-height: 50px; background: var(--bg); padding: 13px 15px; }
+form input { width: 100%; min-height: 50px; background: var(--panel); padding: 13px 15px; }
 .password-label { margin-top: 22px; }
 .password-field { position: relative; }
 .password-field input { padding-right: 50px; }
@@ -120,20 +120,22 @@ form input { width: 100%; min-height: 50px; background: var(--bg); padding: 13px
 .login-help p { line-height: 1.8; margin: 12px 0 0; }
 .err-alert { margin-top: 16px; padding: 12px 14px; border-radius: 8px; background: var(--danger-soft); color: var(--danger); font-size: 13px; }
 .landing-foot { padding: 18px 20px 24px; text-align: center; color: var(--muted); font-size: 12px; }
-@media (max-width: 1000px) { .landing-body { gap: 40px; padding-inline: 32px; } .landing-top { padding-inline: 32px; } .hero { padding: 36px; } }
+@media (max-width: 1000px) {
+  .landing-body { gap: 36px; padding: 48px 32px; }
+  .landing-top { padding-inline: 32px; }
+  .login-side { padding-left: 36px; }
+}
 @media (max-width: 760px) {
   .landing-top { padding: 20px 24px; }
   .platform-name { display: none; }
-  .landing-body { display: flex; flex-direction: column; gap: 24px; padding: 16px 24px 0; }
-  /* 手机先展示登录操作，避免用户滑过宣传内容才能进入系统。 */
-  .login-side { order: -1; }
-  .login-card { max-width: 420px; padding: 12px 0 24px; }
-  .login-card h2 { font-size: 28px; }
+  .landing-body { display: flex; flex-direction: column; gap: 32px; padding: 28px 24px 0; align-items: stretch; }
+  /* 手机先展示登录操作，介绍放到表单之后。 */
+  .login-side { order: -1; border: 0; padding: 0; justify-content: center; }
+  .login-card { max-width: 420px; padding: 8px 0 16px; }
   .card-sub { margin-bottom: 28px; }
-  .hero { padding: 28px; border-radius: 16px; }
+  .hero { padding: 28px 0; border-top: 1px solid var(--border); }
+  .hero-label { margin-bottom: 16px; }
   .hero h1 { font-size: 30px; }
   .hero .lead { font-size: 14px; margin-bottom: 24px; }
-  .features { gap: 18px; }
-  .languages { margin-top: 26px; }
 }
 </style>

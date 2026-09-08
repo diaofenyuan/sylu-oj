@@ -3,7 +3,7 @@
     <a class="skip-link" href="#main-content">跳转到主要内容</a>
     <header v-if="!isLogin" class="topbar">
       <router-link :to="homeFor(role)" class="brand" aria-label="SYLU-OJ 首页">
-        <span class="logo">OJ<span></span></span>
+        <span class="logo">OJ</span>
         <span class="brand-name">SYLU<span class="brand-suffix"> / OJ</span></span>
         <span class="brand-tag">{{ role === 'STUDENT' ? '学生端' : role === 'ADMIN' ? '管理端' : '教师端' }}</span>
       </router-link>
@@ -60,8 +60,7 @@ function logout() { clearSession(); router.push('/login') }
 .app-shell { min-height: 100dvh; display: flex; flex-direction: column; }
 .topbar { position: sticky; top: 0; z-index: 50; display: flex; align-items: center; gap: 40px; min-height: 76px; padding: 0 clamp(24px, 4vw, 64px); background: var(--panel); border-bottom: 1px solid var(--border); }
 .brand { display: flex; align-items: center; gap: 11px; flex-shrink: 0; color: var(--text); white-space: nowrap; }
-.logo { display: grid; place-items: center; position: relative; width: 36px; height: 36px; border-radius: 11px; background: var(--button-bg); color: #fff; font-size: 14px; font-weight: 750; letter-spacing: -1px; }
-.logo span { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #b9d1ff; right: 6px; bottom: 7px; }
+.logo { display: grid; place-items: center; position: relative; width: 36px; height: 36px; border-radius: 7px; background: var(--text); color: var(--panel); font-size: 14px; font-weight: 750; letter-spacing: -1px; }
 .brand-name { font-size: 18px; font-weight: 700; letter-spacing: 0.01em; }
 .brand-suffix { color: var(--muted); font-weight: 450; }
 .brand-tag { color: var(--muted); font-size: 12px; border-left: 1px solid var(--border-strong); padding-left: 12px; margin-left: 3px; }
