@@ -170,4 +170,14 @@ main.workbench {
   flex-direction: column;
   overflow: hidden;
 }
+
+@media (max-width: 640px) {
+  .topbar { flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .brand { flex-shrink: 0; gap: 7px; white-space: nowrap; }
+  .logo { flex-shrink: 0; }
+  .topbar button { width: auto; flex-shrink: 0; white-space: nowrap; }
+  .topbar .theme-toggle { width: 36px; }
+  nav { order: 1; flex: 1 0 100%; flex-wrap: wrap; }
+  nav a { white-space: nowrap; }
+}
 </style>

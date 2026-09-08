@@ -1232,11 +1232,33 @@ onBeforeUnmount(() => {
 }
 
 @media (max-width: 900px) {
+  .oj-workbench button { width: auto; white-space: nowrap; }
   .wb-body { flex-direction: column; overflow-y: auto; }
-  .wb-left { width: 100% !important; max-width: none; }
+  .wb-left { width: 100% !important; min-width: 0; max-width: none; }
   .wb-splitter { display: none; }
-  .wb-right { min-height: 520px; }
+  .wb-right { flex: none; min-height: 0; }
+  .cm-wrap { flex: none; height: 340px; }
   .selftest-grid { grid-template-columns: 1fr; }
-  .tb-title strong { max-width: 32vw; }
+  .wb-topbar { flex-wrap: wrap; gap: 8px; }
+  .tb-title { flex: 1; }
+  .tb-title strong { min-width: 0; }
+  .tb-title .chip { flex-shrink: 0; }
+  .tb-nav { order: 1; margin-left: 0; }
+  .tb-progress { order: 1; margin-left: auto; white-space: nowrap; }
+  .assign-meta { flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px; }
+  .assign-title { flex-basis: 100%; }
+  .pr-scroll { flex: none; overflow: visible; }
+  .sample-head { flex-wrap: wrap; }
+  .sample-head strong { white-space: nowrap; }
+  .sample-head .spacer, .code-toolbar .spacer, .rp-tabs .spacer { display: none; }
+  .code-toolbar { flex-wrap: wrap; gap: 6px; }
+  .code-toolbar > button, .code-toolbar select, .file-tab { flex-shrink: 0; }
+  .mode-tag { flex-basis: 100%; order: 1; }
+  .result-panel { height: auto; }
+  .rp-tabs { flex-wrap: wrap; padding: 8px; }
+  .rp-tabs .run-btn, .rp-tabs .submit-btn { flex: 1 0 120px; }
+  .rp-body { flex: none; max-height: 400px; }
+  .rp-idle, .rp-pending { height: auto; min-height: 100px; }
+  .result-line, .st-label { flex-wrap: wrap; gap: 8px; }
 }
 </style>

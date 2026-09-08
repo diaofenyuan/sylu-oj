@@ -267,6 +267,11 @@ function getBarColor(status) {
 }
 
 @media (max-width: 768px) {
+  .details-header { flex-wrap: wrap; gap: 6px; padding: 10px; }
+  .perf-summary { flex-basis: 100%; }
+  .details-body { padding: 10px; }
+  .case-item, .case-left, .case-right { flex-wrap: wrap; gap: 8px; }
+  .case-item { padding: 10px; }
   .perf-charts {
     grid-template-columns: 1fr;
   }
