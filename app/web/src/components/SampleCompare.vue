@@ -95,6 +95,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { normalizeOutput } from '../composables/selfTestFeedback'
 
 const props = defineProps({
   visible: Boolean,
@@ -107,7 +108,7 @@ const props = defineProps({
 
 const showRaw = ref(false)
 
-const passed = computed(() => normalize(props.expected) === normalize(props.actual))
+const passed = computed(() => normalizeOutput(props.expected) === normalizeOutput(props.actual))
 
 const expectedLines = computed(() => (props.expected || '').split('\n'))
 const actualLines = computed(() => (props.actual || '').split('\n'))
@@ -119,10 +120,6 @@ const whitespaceDiff = computed(() => {
   const act = (props.actual || '').trim()
   return exp === act && exp !== (props.expected || '')
 })
-
-function normalize(text) {
-  return (text || '').split('\n').map(line => line.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '')
-}
 
 function highlightDiff(text, compare) {
   if (!text || !compare) return escapeHtml(text || '')

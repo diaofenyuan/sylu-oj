@@ -63,10 +63,11 @@
                   <strong>示例 {{ sample.orderNum }}</strong>
                   <span class="spacer"></span>
                   <button class="mini-btn" @click="copyText(sample.input, '输入已复制')">复制输入</button>
-                  <button v-if="sample.expectedOutput" class="mini-btn" @click="copyText(sample.expectedOutput, '输出已复制')">复制输出</button>
+                  <button v-if="sample.expectedOutput != null" class="mini-btn" @click="copyText(sample.expectedOutput, '输出已复制')">复制输出</button>
+                  <button class="mini-btn" :disabled="running || !code.trim() || !canSubmitNow" @click="runSample(sample)">用此样例自测</button>
                 </div>
                 <div class="sample-io"><span>输入</span><pre>{{ sample.input }}</pre></div>
-                <div class="sample-io" v-if="sample.expectedOutput"><span>输出</span><pre>{{ sample.expectedOutput }}</pre></div>
+                <div class="sample-io" v-if="sample.expectedOutput != null"><span>输出</span><pre>{{ sample.expectedOutput }}</pre></div>
               </div>
             </div>
 
@@ -121,7 +122,7 @@
             </button>
             <span class="spacer"></span>
             <button class="mini-btn" @click="panelOpen = !panelOpen">{{ panelOpen ? '▾ 收起' : '▴ 展开' }}</button>
-            <button class="run-btn" :disabled="running || !selected || !canSubmitNow" @click="runFromButton">
+            <button class="run-btn" :disabled="running || !selected || !code.trim() || !canSubmitNow" @click="runFromButton">
               <Icon :icon="running ? 'mdi:loading' : 'mdi:play'" :class="{ 'spin-icon': running }" />
               {{ running ? '运行中…' : '自测运行' }}
             </button>
@@ -163,32 +164,34 @@
 
             <!-- 自测运行 -->
             <template v-else-if="panel === 'selftest'">
+              <p v-if="selfTestStale" class="muted" role="status">代码、语言或输入已修改，以下为上次运行结果，请重新自测。</p>
               <div class="selftest-grid">
                 <div class="st-io">
                   <div class="st-label">自测输入 <small>(可粘贴样例输入)</small></div>
-                  <textarea v-model="selfTestInput" rows="5" spellcheck="false" class="st-area mono"></textarea>
+                  <textarea v-model="selfTestInput" aria-label="自测输入" rows="5" spellcheck="false" class="st-area mono"></textarea>
                 </div>
                 <div class="st-io">
                   <div class="st-label">
                     运行输出
                     <span v-if="selfTestResult">
-                      <span class="chip" :class="selfTestPassed ? 'chip-ok' : 'chip-bad'">{{ selfTestPassed ? '通过' : '与期望输出不一致' }}</span>
+                      <span class="chip" :class="selfTestStatus.className" role="status">{{ selfTestStatus.text }}</span>
                       <span class="muted" v-if="selfTestResult.timeUs != null">运行时间:{{ fmtUs(selfTestResult.timeUs) }}</span>
                       <span class="muted" v-if="selfTestResult.peakMemoryKb != null && selfTestResult.peakMemoryKb >= 0">运行内存:{{ fmtMem(selfTestResult.peakMemoryKb) }}</span>
                     </span>
                   </div>
-                  <pre v-if="selfTestResult" class="st-area mono st-out" :class="{ bad: selfTestFailedPhase }">{{ selfTestOutput }}</pre>
+                  <pre v-if="selfTestResult" class="st-area mono st-out" :class="{ bad: selfTestStatus.failed }">{{ selfTestOutput }}</pre>
                   <pre v-else class="st-area mono st-out dim">运行后显示输出</pre>
                 </div>
               </div>
+              <p v-if="selfTestResult?.message" class="st-err" role="alert">{{ selfTestResult.message }}</p>
               <p v-if="selfTestResult?.compileError" class="st-err mono">{{ selfTestResult.compileError }}</p>
               <p v-else-if="selfTestResult?.stderr" class="st-err mono">{{ selfTestResult.stderr }}</p>
               <p v-if="selfTestResult?.timedOut" class="st-err">运行超时,请检查是否有死循环或阻塞输入</p>
               <SampleCompare
                 v-if="showSampleCompare"
                 visible
-                :input="selfTestInput"
-                :expected="matchedSample.expectedOutput"
+                :input="selfTestContext.input"
+                :expected="selfTestContext.expectedOutput"
                 :actual="selfTestResult.output || ''"
                 :time-ms="selfTestTimeMs"
                 :memory-kb="selfTestResult.peakMemoryKb"
@@ -301,6 +304,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { createDraftStore } from '../composables/draftStore'
+import { normalizeOutput, selfTestFeedback } from '../composables/selfTestFeedback'
 import { useJudgeStatus } from '../composables/useJudgeStatus'
 import CaseDetails from './CaseDetails.vue'
 import ErrorDiagnostics from './ErrorDiagnostics.vue'
@@ -424,6 +428,8 @@ const resultPhase = ref('idle')
 const latestResult = ref({ status: null, score: null, timeMs: null })
 const selfTestInput = ref('')
 const selfTestResult = ref(null)
+const selfTestContext = ref(null)
+let runVersion = 0
 const submissions = ref([])
 const leftWidth = ref(480)
 const showTemplates = ref(false)
@@ -460,32 +466,22 @@ const currentIndex = computed(() =>
   problems.value.findIndex(problem => problem.problemId === selectedId.value))
 const hasPrev = computed(() => currentIndex.value > 0)
 const hasNext = computed(() => currentIndex.value >= 0 && currentIndex.value < problems.value.length - 1)
-const selfTestPassed = computed(() => {
-  if (!selfTestResult.value || selfTestResult.value.phase !== 'FINISHED') return false
-  const expected = matchedSample.value?.expectedOutput
-  if (expected == null) return null
-  return normalize(expected) === normalize(selfTestResult.value.output)
-})
-const selfTestFailedPhase = computed(() =>
-  selfTestResult.value && selfTestResult.value.phase !== 'FINISHED')
+const selfTestStatus = computed(() => selfTestFeedback(selfTestResult.value, selfTestContext.value?.expectedOutput))
+const selfTestStale = computed(() => selfTestResult.value && selfTestContext.value && (
+  selfTestContext.value.code !== code.value || selfTestContext.value.language !== language.value
+  || selfTestContext.value.input !== selfTestInput.value))
 const selfTestOutput = computed(() => {
   const r = selfTestResult.value
   if (!r) return ''
-  return r.output || r.stderr || r.compileError || '(无输出)'
+  return r.output || '(无标准输出)'
 })
-const matchedSample = computed(() =>
-  selected.value?.samples?.find(sample => normalize(sample.input) === normalize(selfTestInput.value)))
 const attemptedCount = computed(() =>
   problems.value.filter(problem => problem.status !== 'UNATTEMPTED' && problem.status !== 'AC').length)
 const todoCount = computed(() => problems.value.filter(problem => problem.status === 'UNATTEMPTED').length)
 const selfTestTimeMs = computed(() =>
   selfTestResult.value?.timeUs != null ? Math.max(0, Math.round(selfTestResult.value.timeUs / 1000)) : null)
 const showSampleCompare = computed(() =>
-  Boolean(selfTestResult.value && matchedSample.value && selfTestResult.value.phase === 'FINISHED'))
-
-function normalize(text) {
-  return String(text ?? '').split('\n').map(line => line.replace(/\s+$/, '')).join('\n').replace(/\n+$/, '')
-}
+  Boolean(selfTestStatus.value?.comparable))
 
 function displayCode(problem) {
   if (!problem) return ''
@@ -661,6 +657,9 @@ async function selectProblem(problemId) {
   resultPhase.value = 'idle'
   latestResult.value = { status: null, score: null, timeMs: null }
   selfTestResult.value = null
+  selfTestContext.value = null
+  runVersion++
+  running.value = false
   caseDetails.value = []
   submissions.value = []
   clearPoll()
@@ -787,26 +786,27 @@ async function submit() {
 }
 
 async function runSelfTest() {
-  if (!selected.value || running.value) return
+  if (!selected.value || running.value || !code.value.trim() || !canSubmitNow.value) return
+  const version = ++runVersion
+  const request = { problemId: selected.value.problemId, language: language.value, code: code.value, input: selfTestInput.value }
+  // 对比只绑定发起请求时的样例，编辑输入或切题后不能给旧结果重新判分。
+  const sample = selected.value.samples?.find(sample => normalizeOutput(sample.input) === normalizeOutput(request.input))
+  selfTestContext.value = { ...request, expectedOutput: sample?.expectedOutput }
   running.value = true
   selfTestResult.value = null
   try {
     const path = isAssignment.value
       ? `/student/targets/${props.targetId}/run`
       : '/student/practice/run'
-    selfTestResult.value = await api(path, {
+    const result = await api(path, {
       method: 'POST',
-      body: {
-        problemId: selected.value.problemId,
-        language: language.value,
-        code: code.value,
-        input: selfTestInput.value
-      }
+      body: request
     })
+    if (version === runVersion) selfTestResult.value = result
   } catch (e) {
-    selfTestResult.value = { phase: 'FINISHED', output: '', stderr: e.message, exitCode: -1, timeUs: 0, peakMemoryKb: -1, timedOut: false }
+    if (version === runVersion) selfTestResult.value = { phase: 'REQUEST_ERROR', message: e.message }
   } finally {
-    running.value = false
+    if (version === runVersion) running.value = false
   }
 }
 
@@ -844,6 +844,11 @@ function openPanel(key) {
 function runFromButton() {
   openPanel('selftest')
   runSelfTest()
+}
+
+function runSample(sample) {
+  selfTestInput.value = sample.input ?? ''
+  runFromButton()
 }
 
 function step(delta) {
@@ -904,6 +909,7 @@ onMounted(() => {
 })
 onBeforeUnmount(() => {
   selectionVersion++
+  runVersion++
   clearPoll()
   window.removeEventListener('keydown', onKeydown)
   editorView?.destroy()
