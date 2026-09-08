@@ -273,7 +273,7 @@
       <div class="card section">
         <div class="row section-head">
           <h3>本地账号</h3>
-          <p class="muted" style="margin: 0;">支持多个管理员；角色任意切换，停用后立即禁止登录。主管理员（bootstrap）启动时自动恢复启用、不可移除</p>
+          <p class="muted" style="margin: 0;">可创建不同角色的账号。停用后将无法登录，初始主管理员不可移除。</p>
         </div>
         <div class="row" style="margin-bottom: 12px;">
           <select v-model="acctForm.role" aria-label="账号角色" class="slim">

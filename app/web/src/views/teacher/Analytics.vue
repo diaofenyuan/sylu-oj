@@ -1,8 +1,9 @@
 <template>
   <div>
+    <router-link :to="`/teacher/analytics/${targetId}`" class="back-link"><Icon icon="mdi:arrow-left" aria-hidden="true" />返回成绩分析</router-link>
     <div class="page-head">
-      <h2>成绩分析（目标班级 #{{ targetId }}）</h2>
-      <p class="muted">班级表现多维统计与成绩导出</p>
+      <h2>成绩明细</h2>
+      <p class="muted">查看班级提交情况与学生成绩，按需导出。</p>
     </div>
 
     <p v-if="loading" role="status">成绩加载中…</p>
@@ -39,9 +40,9 @@
     <div class="card export-card">
       <h3>导出成绩</h3>
       <div class="row">
-        <select v-model="format"><option value="XLSX">XLSX</option><option value="CSV">CSV(ZIP)</option></select>
-        <input v-model="studentNo" placeholder="学号筛选（可选）" />
-        <input v-model="nameKeyword" placeholder="姓名关键词（可选）" />
+        <select v-model="format" aria-label="导出格式"><option value="XLSX">Excel (XLSX)</option><option value="CSV">CSV (ZIP)</option></select>
+        <input v-model="studentNo" aria-label="学号筛选" placeholder="学号筛选（可选）" />
+        <input v-model="nameKeyword" aria-label="姓名关键词" placeholder="姓名关键词（可选）" />
         <button :disabled="exporting || downloading || loading || !!loadError" @click="exportGrades">{{ exporting ? '导出中…' : '发起导出' }}</button>
         <button v-if="canDownload" :disabled="downloading" class="secondary" @click="download">{{ downloading ? '下载中…' : '下载文件' }}</button>
       </div>

@@ -1,6 +1,6 @@
 <template>
   <div class="case-details">
-    <div class="details-header" @click="expanded = !expanded">
+    <div class="details-header" role="button" tabindex="0" :aria-expanded="expanded" @click="expanded = !expanded" @keydown.enter.prevent="expanded = !expanded" @keydown.space.prevent="expanded = !expanded">
       <Icon :icon="expanded ? 'mdi:chevron-down' : 'mdi:chevron-right'" />
       <strong>测试点详情</strong>
       <span class="muted">({{ passedCount }}/{{ cases.length }} 通过)</span>
@@ -125,7 +125,7 @@ function getCaseClass(status) {
 function getBarColor(status) {
   if (status === 'AC') return 'var(--ok)'
   if (status === 'TLE') return 'var(--warn)'
-  if (status === 'MLE') return '#9333ea'
+  if (status === 'MLE') return 'var(--muted)'
   return 'var(--danger)'
 }
 </script>

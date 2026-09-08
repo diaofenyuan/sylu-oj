@@ -75,7 +75,7 @@
               </div>
             </div>
 
-            <p class="pr-tip">提交后代码将进入隔离沙盒执行全部隐藏用例;自测运行不占提交次数。</p>
+            <p class="pr-tip">自测用于检查输入输出，不占提交次数；提交评测会运行全部测试用例。</p>
           </div>
         </template>
         <div v-else class="pr-empty" role="status"><Icon icon="mdi:code-braces" aria-hidden="true" /><span>{{ loading ? '正在加载题目…' : '打开「题目列表」，开始下一次练习' }}</span></div>
@@ -146,7 +146,7 @@
             <template v-if="panel === 'result'">
               <div v-if="resultPhase === 'idle'" class="rp-idle"><Icon icon="mdi:console-line" aria-hidden="true" /><span>先自测，再提交</span><small>自测不占提交次数，提交评测后在这里查看结果。</small></div>
               <div v-else-if="resultPhase === 'pending'" class="rp-pending">
-                <Icon icon="mdi:loading" class="spin-icon" /> 代码已送入安全沙盒,正在评测隐藏用例…
+                <Icon icon="mdi:loading" class="spin-icon" /> 正在评测，请稍候…
               </div>
               <template v-else>
                 <div class="result-line">

@@ -10,17 +10,17 @@
       </div>
 
       <div class="picker-body">
-        <div class="tabs">
+        <div class="tabs" role="group" aria-label="模板类型">
           <button 
             class="tab-btn" 
-            :class="{ active: activeTab === 'basic' }" 
+            :class="{ active: activeTab === 'basic' }" :aria-pressed="activeTab === 'basic'"
             @click="activeTab = 'basic'">
             <Icon icon="mdi:file-document" />
             基础模板
           </button>
           <button 
             class="tab-btn" 
-            :class="{ active: activeTab === 'snippets' }" 
+            :class="{ active: activeTab === 'snippets' }" :aria-pressed="activeTab === 'snippets'"
             @click="activeTab = 'snippets'">
             <Icon icon="mdi:puzzle" />
             代码片段
@@ -117,7 +117,6 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -188,9 +187,9 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 }
 
 .tab-btn.active {
-  background: var(--button-bg);
-  border-color: var(--accent);
-  color: #fff;
+  background: var(--accent-soft);
+  border-color: var(--border);
+  color: var(--accent);
 }
 
 .template-card, .snippet-card {
@@ -206,7 +205,6 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 .template-card:hover, .snippet-card:hover {
   background: var(--bg);
   border-color: var(--accent);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.15);
 }
 
 .card-header, .snippet-header {

@@ -12,17 +12,17 @@
       </div>
 
       <div class="modal-body">
-        <div class="tabs">
+        <div class="tabs" role="group" aria-label="排行依据">
           <button 
             class="tab-btn" 
-            :class="{ active: activeTab === 'time' }" 
+            :class="{ active: activeTab === 'time' }" :aria-pressed="activeTab === 'time'"
             @click="activeTab = 'time'">
             <Icon icon="mdi:timer" />
             最快时间
           </button>
           <button 
             class="tab-btn" 
-            :class="{ active: activeTab === 'memory' }" 
+            :class="{ active: activeTab === 'memory' }" :aria-pressed="activeTab === 'memory'"
             @click="activeTab = 'memory'">
             <Icon icon="mdi:memory" />
             最少内存
@@ -59,15 +59,9 @@
               <div 
                 v-for="(entry, index) in currentList" 
                 :key="entry.submissionId"
-                class="rank-item"
-                :class="getRankClass(index)">
+                class="rank-item">
                 <span class="col-rank">
-                  <span class="rank-badge" :class="getRankBadgeClass(index)">
-                    <Icon v-if="index === 0" icon="mdi:trophy" />
-                    <Icon v-else-if="index === 1" icon="mdi:medal" />
-                    <Icon v-else-if="index === 2" icon="mdi:medal-outline" />
-                    <span v-else>{{ index + 1 }}</span>
-                  </span>
+                  <span class="rank-badge">{{ index + 1 }}</span>
                 </span>
                 <span class="col-student">{{ entry.studentName }}</span>
                 <span class="col-lang">
@@ -138,19 +132,7 @@ watch([() => props.visible, () => props.problemId, reload], async ([visible, pro
   }
 }, { immediate: true })
 
-function getRankClass(index) {
-  if (index === 0) return 'rank-1st'
-  if (index === 1) return 'rank-2nd'
-  if (index === 2) return 'rank-3rd'
-  return ''
-}
 
-function getRankBadgeClass(index) {
-  if (index === 0) return 'badge-gold'
-  if (index === 1) return 'badge-silver'
-  if (index === 2) return 'badge-bronze'
-  return ''
-}
 
 function formatLanguage(lang) {
   const map = { C: 'C', CPP: 'C++', PYTHON: 'Python', JAVA: 'Java' }
@@ -181,7 +163,6 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
   right: 0;
   bottom: 0;
   background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -217,7 +198,7 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 
 .trophy-icon {
   font-size: 28px;
-  color: #f59e0b;
+  color: var(--muted);
 }
 
 .modal-header h3 {
@@ -277,10 +258,9 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 }
 
 .tab-btn.active {
-  background: var(--button-bg);
-  border-color: var(--accent);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  background: var(--accent-soft);
+  border-color: var(--border);
+  color: var(--accent);
 }
 
 .loading-state, .error-state, .empty-state {
@@ -306,7 +286,7 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 
 .rank-header {
   display: grid;
-  grid-template-columns: 80px 1fr 100px 140px 140px;
+  grid-template-columns: 48px minmax(100px, 1fr) 80px 120px 140px;
   gap: 12px;
   padding: 12px 16px;
   background: var(--panel-2);
@@ -321,69 +301,40 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 .rank-items {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
 }
 
 .rank-item {
   display: grid;
-  grid-template-columns: 80px 1fr 100px 140px 140px;
+  grid-template-columns: 48px minmax(100px, 1fr) 80px 120px 140px;
   gap: 12px;
   padding: 14px 16px;
   background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  border-bottom: 1px solid var(--border);
   align-items: center;
   transition: all 0.15s ease;
 }
 
 .rank-item:hover {
   background: var(--panel-2);
-  transform: translateX(2px);
 }
 
-.rank-1st {
-  border-left: 3px solid #f59e0b;
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.05), var(--panel));
-}
 
-.rank-2nd {
-  border-left: 3px solid #94a3b8;
-  background: linear-gradient(90deg, rgba(148, 163, 184, 0.05), var(--panel));
-}
 
-.rank-3rd {
-  border-left: 3px solid #d97706;
-  background: linear-gradient(90deg, rgba(217, 119, 6, 0.05), var(--panel));
-}
 
 .rank-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  font-variant-numeric: tabular-nums;
   font-weight: 700;
   font-size: 16px;
 }
 
-.badge-gold {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
-}
 
-.badge-silver {
-  background: linear-gradient(135deg, #cbd5e1, #94a3b8);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(148, 163, 184, 0.3);
-}
 
-.badge-bronze {
-  background: linear-gradient(135deg, #fdba74, #d97706);
-  color: #fff;
-  box-shadow: 0 4px 12px rgba(217, 119, 6, 0.3);
-}
 
 .col-student {
   font-weight: 600;
@@ -393,9 +344,9 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 .lang-tag {
   display: inline-block;
   padding: 4px 10px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  border-radius: 6px;
+  background: var(--panel-2);
+  color: var(--muted);
+  border-radius: 5px;
   font-size: 12px;
   font-weight: 600;
 }
@@ -430,13 +381,16 @@ useDialogFocus(() => props.visible, dialogPanel, () => emit('close'))
 
 @media (max-width: 768px) {
   .rank-header, .rank-item {
-    grid-template-columns: 60px 1fr 80px;
+    grid-template-columns: 32px minmax(70px, 1fr) minmax(80px, auto);
+    gap: 8px;
+    padding-inline: 4px;
     font-size: 12px;
   }
   
-  .col-perf, .col-date {
+  .col-lang, .col-date {
     display: none;
   }
 }
+@media (max-width: 480px) { .modal-body, .modal-header, .modal-footer { padding: 16px; } .footer-note { align-items: flex-start; } .footer-note svg { flex-shrink: 0; } }
 .modal-content:focus { outline: none; }
 </style>

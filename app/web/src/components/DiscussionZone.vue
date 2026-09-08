@@ -4,6 +4,7 @@
       <h3>
         <Icon icon="mdi:comment-multiple" />
         题目讨论
+        <span class="count">示例预览</span>
         <span class="count">{{ discussions.length }} 条</span>
       </h3>
       <button @click="showEditor = !showEditor" class="btn-primary">
@@ -519,7 +520,7 @@ function deleteDiscussion(disc) {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: var(--accent);
+  background: var(--button-bg);
   color: #fff;
 }
 
@@ -562,7 +563,7 @@ function deleteDiscussion(disc) {
 }
 
 .filter-tabs button.active {
-  background: var(--accent);
+  background: var(--button-bg);
   border-color: var(--accent);
   color: #fff;
 }
@@ -591,12 +592,12 @@ function deleteDiscussion(disc) {
 }
 
 .discussion-card:hover {
-  box-shadow: var(--shadow-md);
+  border-color: var(--border-strong);
 }
 
 .discussion-card.official {
   border-color: var(--accent);
-  background: linear-gradient(to right, var(--panel), var(--accent-soft));
+  background: var(--panel);
 }
 
 .discussion-card.pinned {
@@ -618,7 +619,7 @@ function deleteDiscussion(disc) {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: var(--accent);
+  background: var(--button-bg);
   color: #fff;
   display: grid;
   place-items: center;
@@ -812,7 +813,7 @@ function deleteDiscussion(disc) {
   align-items: center;
   gap: 6px;
   padding: 6px 12px;
-  background: var(--accent);
+  background: var(--button-bg);
   color: #fff;
 }
 

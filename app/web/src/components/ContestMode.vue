@@ -1,5 +1,6 @@
 <template>
   <div class="contest-mode">
+    <p class="preview-note">比赛功能预览 · 以下比赛与榜单为示例数据</p>
     <div class="contest-header">
       <div class="contest-info">
         <h2>{{ contest.title }}</h2>
@@ -418,7 +419,7 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: flex-start;
   padding: 24px;
-  background: linear-gradient(135deg, var(--panel), var(--panel-2));
+  background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
@@ -440,20 +441,19 @@ onUnmounted(() => {
   align-items: center;
   gap: 8px;
   padding: 12px 20px;
-  border-radius: 999px;
+  border-radius: 6px;
   font-weight: 600;
   font-size: 14px;
 }
 
 .status-pending {
-  background: var(--muted-soft);
+  background: var(--panel-2);
   color: var(--muted);
 }
 
 .status-running {
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #fff;
-  animation: pulse 2s infinite;
+  background: var(--ok-soft);
+  color: var(--ok);
 }
 
 .status-ended {
@@ -462,10 +462,7 @@ onUnmounted(() => {
   color: var(--muted);
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.8; }
-}
+
 
 /* 倒计时 */
 .contest-timer {
@@ -474,7 +471,7 @@ onUnmounted(() => {
   align-items: center;
   padding: 20px 24px;
   background: var(--panel);
-  border: 2px solid var(--accent);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
@@ -586,25 +583,23 @@ onUnmounted(() => {
 .problem-card {
   padding: 20px;
   background: var(--panel);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .problem-card:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
   border-color: var(--accent);
 }
 
 .problem-card.solved {
   border-color: var(--ok);
-  background: linear-gradient(135deg, var(--panel), var(--ok-soft));
+  background: var(--panel);
 }
 
 .problem-card.first-blood {
-  border-color: #ef4444;
+  border-color: var(--danger);
 }
 
 .problem-header {
@@ -617,9 +612,9 @@ onUnmounted(() => {
 .problem-label {
   width: 40px;
   height: 40px;
-  background: var(--accent);
-  color: #fff;
-  border-radius: 50%;
+  background: var(--panel-2);
+  color: var(--text);
+  border-radius: 6px;
   display: grid;
   place-items: center;
   font-size: 20px;
@@ -659,11 +654,11 @@ onUnmounted(() => {
   border-top: 1px solid var(--border);
 }
 
-.first-blood {
+.problem-footer .first-blood {
   display: flex;
   align-items: center;
   gap: 4px;
-  color: #ef4444;
+  color: var(--danger);
   font-weight: 600;
   font-size: 12px;
 }
@@ -685,7 +680,7 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   padding: 8px 16px;
-  background: var(--accent);
+  background: var(--button-bg);
   color: #fff;
 }
 
@@ -721,9 +716,9 @@ onUnmounted(() => {
 .penalty-col { width: 100px; }
 .problem-col { width: 80px; }
 
-.rank-1 { background: linear-gradient(90deg, rgba(251, 191, 36, 0.1), transparent); }
-.rank-2 { background: linear-gradient(90deg, rgba(203, 213, 225, 0.1), transparent); }
-.rank-3 { background: linear-gradient(90deg, rgba(251, 146, 60, 0.1), transparent); }
+
+
+
 
 .rank-badge {
   display: inline-flex;
@@ -734,20 +729,11 @@ onUnmounted(() => {
   font-weight: 700;
 }
 
-.rank-gold {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  color: #92400e;
-}
+.rank-gold { background: var(--panel-2); color: var(--text); }
 
-.rank-silver {
-  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-  color: #475569;
-}
+.rank-silver { background: var(--panel-2); color: var(--text); }
 
-.rank-bronze {
-  background: linear-gradient(135deg, #fed7aa, #fdba74);
-  color: #7c2d12;
-}
+.rank-bronze { background: var(--panel-2); color: var(--text); }
 
 .team-info {
   display: flex;
@@ -834,6 +820,8 @@ onUnmounted(() => {
   font-size: 13px;
   color: var(--muted);
 }
+
+.preview-note { margin: 0; color: var(--muted); font-size: 12px; }
 
 @media (max-width: 1024px) {
   .contest-rules {

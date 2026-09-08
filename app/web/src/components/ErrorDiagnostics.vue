@@ -2,7 +2,7 @@
   <div v-if="hasError" class="error-diagnostics">
     <div class="diagnostic-header">
       <Icon icon="mdi:lightbulb-on" class="bulb-icon" />
-      <strong>错误诊断助手</strong>
+      <strong>排查建议</strong>
     </div>
     
     <div class="diagnostic-body">
@@ -242,18 +242,14 @@ const bscSuggestions = computed(() => [
 
 <style scoped>
 .error-diagnostics {
-  background: linear-gradient(135deg, #fef2f2 0%, #fff 100%);
-  border: 1px solid #fca5a5;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-left: 4px solid var(--danger);
   border-radius: 10px;
   padding: 16px;
   margin-top: 12px;
 }
 
-.dark .error-diagnostics {
-  background: linear-gradient(135deg, #3a1a1a 0%, var(--panel) 100%);
-  border-color: #7f1d1d;
-}
 
 .diagnostic-header {
   display: flex;
@@ -265,7 +261,7 @@ const bscSuggestions = computed(() => [
 }
 
 .bulb-icon {
-  color: #f59e0b;
+  color: var(--warn);
   font-size: 20px;
 }
 

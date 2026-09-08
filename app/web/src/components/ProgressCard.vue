@@ -272,9 +272,9 @@ const timeRemaining = computed(() => {
   align-items: center;
   gap: 10px;
   padding: 12px;
-  background: var(--panel-2);
-  border-radius: 8px;
+  border-right: 1px solid var(--border);
 }
+.stat-item:last-child { border-right: 0; }
 
 .stat-icon {
   font-size: 24px;
@@ -324,12 +324,12 @@ const timeRemaining = computed(() => {
 }
 
 .completed-fill {
-  background: linear-gradient(90deg, #10b981, #059669);
+  background: var(--ok);
   left: 0;
 }
 
 .progress-fill {
-  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  background: var(--accent);
 }
 
 .progress-bar-labels {
@@ -343,12 +343,13 @@ const timeRemaining = computed(() => {
   display: flex;
   align-items: center;
   gap: 6px;
+  flex-wrap: wrap;
   padding: 10px 12px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
+  background: var(--panel-2);
+  border: 1px solid var(--border);
   border-radius: 8px;
   font-size: 13px;
-  color: var(--accent);
+  color: var(--muted);
 }
 
 .deadline-info.overdue {
@@ -376,5 +377,6 @@ const timeRemaining = computed(() => {
   .stat-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+  .stat-item:nth-child(2n) { border-right: 0; }
 }
 </style>

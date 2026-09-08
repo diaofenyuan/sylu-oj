@@ -2,8 +2,8 @@
   <div class="analytics-enhanced">
     <router-link to="/teacher/assignments" class="back-link"><Icon icon="mdi:arrow-left" aria-hidden="true" />返回作业管理</router-link>
     <div class="page-head">
-      <h2>成绩分析（目标班级 #{{ targetId }}）</h2>
-      <p class="muted">班级表现多维统计与成绩导出</p>
+      <h2>成绩分析</h2>
+      <p class="muted">查看班级提交情况、分数分布与学生成绩。</p>
     </div>
 
     <p v-if="loading" role="status">成绩加载中…</p>
@@ -11,28 +11,24 @@
     <!-- 概览卡片 -->
     <div class="overview-grid">
       <div class="stat-card">
-        <Icon icon="mdi:account-group" class="stat-icon" />
         <div class="stat-content">
           <div class="stat-value">{{ rows.length }}</div>
           <div class="stat-label">总学生数</div>
         </div>
       </div>
       <div class="stat-card">
-        <Icon icon="mdi:chart-line" class="stat-icon success" />
         <div class="stat-content">
           <div class="stat-value">{{ avgScore.toFixed(1) }}</div>
           <div class="stat-label">平均分</div>
         </div>
       </div>
       <div class="stat-card">
-        <Icon icon="mdi:percent" class="stat-icon accent" />
         <div class="stat-content">
           <div class="stat-value">{{ avgPassRate.toFixed(1) }}%</div>
           <div class="stat-label">平均通过率</div>
         </div>
       </div>
       <div class="stat-card">
-        <Icon icon="mdi:file-document-multiple" class="stat-icon warn" />
         <div class="stat-content">
           <div class="stat-value">{{ totalSubmissions }}</div>
           <div class="stat-label">总提交数</div>
@@ -40,18 +36,19 @@
       </div>
     </div>
 
+    <div class="charts-grid">
     <!-- 状态分布 -->
     <div class="card">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:chart-donut" />
-          班级状态分布
+          评测结果分布
         </h3>
       </div>
       <div class="status-chart">
         <div v-for="(v, k) in classDist" :key="k" class="status-bar">
           <div class="status-info">
-            <span class="status-label">{{ k }}</span>
+            <span class="status-label">{{ getStatusText(k) }} <small>{{ k }}</small></span>
             <span class="status-value">{{ v }} 次</span>
           </div>
           <div class="status-track">
@@ -91,12 +88,14 @@
       </div>
     </div>
 
-    <!-- 提交时间热力图 -->
+    </div>
+
+    <!-- 学习情况 -->
     <div class="card">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:clock-outline" />
-          活跃度分析
+          学习情况
         </h3>
       </div>
       <div class="activity-info">
@@ -115,17 +114,19 @@
       </div>
     </div>
 
-    <!-- 学生排名表 -->
+    <!-- 学生成绩表 -->
     <div class="card">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:podium" />
-          学生排名
+          学生成绩
         </h3>
         <div class="header-actions">
           <input 
             v-model="searchKeyword" 
-            placeholder="搜索学号或姓名..."
+            placeholder="搜索学号或姓名"
+            aria-label="搜索学生成绩"
+            type="search"
             class="search-input"
           />
         </div>
@@ -135,38 +136,37 @@
         <table>
           <thead>
             <tr>
-              <th @click="sortBy('rank')">
+              <th :aria-sort="sortField === 'rank' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'"><button class="sort-button" @click="sortBy('rank')">
                 排名
                 <Icon v-if="sortField === 'rank'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
-              </th>
-              <th @click="sortBy('studentNo')">
+              </button></th>
+              <th :aria-sort="sortField === 'studentNo' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'"><button class="sort-button" @click="sortBy('studentNo')">
                 学号
                 <Icon v-if="sortField === 'studentNo'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
-              </th>
-              <th @click="sortBy('name')">
+              </button></th>
+              <th :aria-sort="sortField === 'name' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'"><button class="sort-button" @click="sortBy('name')">
                 姓名
                 <Icon v-if="sortField === 'name'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
-              </th>
-              <th @click="sortBy('totalScore')">
+              </button></th>
+              <th :aria-sort="sortField === 'totalScore' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'"><button class="sort-button" @click="sortBy('totalScore')">
                 总分
                 <Icon v-if="sortField === 'totalScore'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
-              </th>
-              <th @click="sortBy('passRate')">
+              </button></th>
+              <th :aria-sort="sortField === 'passRate' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'"><button class="sort-button" @click="sortBy('passRate')">
                 通过率
                 <Icon v-if="sortField === 'passRate'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
-              </th>
-              <th @click="sortBy('submissionCount')">
+              </button></th>
+              <th :aria-sort="sortField === 'submissionCount' ? (sortOrder === 'asc' ? 'ascending' : 'descending') : 'none'"><button class="sort-button" @click="sortBy('submissionCount')">
                 提交次数
                 <Icon v-if="sortField === 'submissionCount'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
-              </th>
+              </button></th>
               <th>状态分布</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="r in filteredRows" :key="r.studentId" :class="getRankClass(r.rank)">
+            <tr v-for="r in filteredRows" :key="r.studentId">
               <td>
-                <span class="rank-badge" :class="getRankClass(r.rank)">
-                  <Icon v-if="r.rank <= 3" :icon="getRankIcon(r.rank)" />
+                <span class="rank-badge">
                   {{ r.rank }}
                 </span>
               </td>
@@ -206,19 +206,19 @@
       </div>
       <div class="export-form">
         <div class="form-group">
-          <label>导出格式</label>
-          <select v-model="format">
+          <label for="grade-format">导出格式</label>
+          <select id="grade-format" v-model="format">
             <option value="XLSX">Excel (XLSX)</option>
             <option value="CSV">CSV (ZIP)</option>
           </select>
         </div>
         <div class="form-group">
-          <label>学号筛选</label>
-          <input v-model="studentNo" placeholder="可选" />
+          <label for="grade-student">学号筛选</label>
+          <input id="grade-student" v-model="studentNo" placeholder="可选" />
         </div>
         <div class="form-group">
-          <label>姓名关键词</label>
-          <input v-model="nameKeyword" placeholder="可选" />
+          <label for="grade-name">姓名关键词</label>
+          <input id="grade-name" v-model="nameKeyword" placeholder="可选" />
         </div>
       </div>
       <div class="export-actions">
@@ -245,6 +245,9 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../../api'
 import { useGradeExport } from '../../composables/useGradeExport'
+import { useJudgeStatus } from '../../composables/useJudgeStatus'
+
+const { getStatusText } = useJudgeStatus()
 
 const route = useRoute()
 const targetId = computed(() => route.params.targetId)
@@ -302,11 +305,11 @@ const maxBucketCount = computed(() => {
   return Math.max(...scoreDistribution.value.map(b => b.count), 1)
 })
 
-// 活跃度分析
+// 学习情况
 const mostActiveStudent = computed(() => {
   if (!rows.value.length) return null
   return rows.value.reduce((max, r) => 
-    r.submissionCount > (max?.submissionCount || 0) ? { name: r.name, count: r.submissionCount } : max
+    !max || r.submissionCount > max.count ? { name: r.name, count: r.submissionCount } : max
   , null)
 })
 
@@ -358,19 +361,7 @@ function sortBy(field) {
   }
 }
 
-function getRankClass(rank) {
-  if (rank === 1) return 'rank-gold'
-  if (rank === 2) return 'rank-silver'
-  if (rank === 3) return 'rank-bronze'
-  return ''
-}
 
-function getRankIcon(rank) {
-  if (rank === 1) return 'mdi:trophy'
-  if (rank === 2) return 'mdi:medal'
-  if (rank === 3) return 'mdi:medal-outline'
-  return ''
-}
 
 async function loadAnalytics() {
   const current = ++loadSequence
@@ -405,370 +396,74 @@ async function exportGrades() {
 </script>
 
 <style scoped>
-.analytics-enhanced {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-}
-
-/* 概览卡片网格 */
-.overview-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-  transition: all 0.2s ease;
-}
-
-.stat-card:hover {
-  transform: none;
-  box-shadow: var(--shadow-md);
-}
-
-.stat-icon {
-  font-size: 40px;
-  color: var(--text);
-}
-
-.stat-icon.success { color: var(--ok); }
-.stat-icon.accent { color: var(--accent); }
-.stat-icon.warn { color: var(--warn); }
-
-.stat-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.stat-value {
-  font-size: 28px;
-  font-weight: 700;
-  color: var(--text);
-  line-height: 1;
-}
-
-.stat-label {
-  font-size: 13px;
-  color: var(--muted);
-}
-
-/* 卡片头部 */
-.card-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.card-header h3 {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0;
-}
-
-.header-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.search-input {
-  min-width: 200px;
-}
-
-/* 状态图表 */
-.status-chart {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.status-bar {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.status-info {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-}
-
-.status-label {
-  font-weight: 600;
-  color: var(--text);
-}
-
-.status-value {
-  color: var(--muted);
-}
-
-.status-track {
-  height: 24px;
-  background: var(--panel-2);
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.status-fill {
-  height: 100%;
-  transition: width 0.6s ease;
-  border-radius: 12px;
-}
-
-.status-AC { background: linear-gradient(90deg, #10b981, #059669); }
-.status-WA { background: linear-gradient(90deg, #ef4444, #dc2626); }
-.status-TLE { background: linear-gradient(90deg, #f59e0b, #d97706); }
-.status-MLE { background: linear-gradient(90deg, #a855f7, #9333ea); }
-.status-CE { background: linear-gradient(90deg, #eab308, #ca8a04); }
-.status-RE { background: linear-gradient(90deg, #f97316, #ea580c); }
-
-.empty-chart {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 40px;
-  color: var(--muted);
-}
-
-/* 分数分布 */
-.score-distribution {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-  padding: 20px;
-}
-
-.score-bucket {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-}
-
-.bucket-bar {
-  width: 100%;
-  height: 150px;
-  background: var(--panel-2);
-  border-radius: 8px 8px 0 0;
-  display: flex;
-  align-items: flex-end;
-  overflow: hidden;
-}
-
-.bucket-fill {
-  width: 100%;
-  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
-  transition: height 0.6s ease;
-  border-radius: 4px 4px 0 0;
-}
-
-.bucket-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.bucket-count {
-  font-size: 11px;
-  color: var(--muted);
-}
-
-/* 活跃度信息 */
-.activity-info {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-}
-
-.activity-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 16px;
-  background: var(--panel-2);
-  border-radius: 8px;
-  font-size: 14px;
-}
-
-/* 表格增强 */
-.table-container {
-  overflow-x: auto;
-}
-
-table th {
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-
-table th:hover {
-  background: var(--panel-2);
-}
-
-.rank-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 13px;
-  background: var(--panel-2);
-  border: 1px solid var(--border);
-}
-
-.rank-badge.rank-gold {
-  background: linear-gradient(135deg, #fef3c7, #fde68a);
-  border-color: #f59e0b;
-  color: #92400e;
-}
-
-.rank-badge.rank-silver {
-  background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-  border-color: #94a3b8;
-  color: #475569;
-}
-
-.rank-badge.rank-bronze {
-  background: linear-gradient(135deg, #fed7aa, #fdba74);
-  border-color: #ea580c;
-  color: #7c2d12;
-}
-
-.score-badge {
-  font-size: 16px;
-  color: var(--accent);
-}
-
-.progress-cell {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.mini-progress {
-  width: 60px;
-  height: 8px;
-  background: var(--panel-2);
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-.mini-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
-  transition: width 0.3s ease;
-}
-
-.status-dist {
-  display: flex;
-  gap: 4px;
-  flex-wrap: wrap;
-}
-
-.mini-chip {
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
+.analytics-enhanced { display: flex; flex-direction: column; gap: 24px; }
+.analytics-enhanced > .card, .analytics-enhanced > .page-head, .back-link { margin-bottom: 0; }
+.overview-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); padding: 24px 0; background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius); }
+.stat-card { padding: 0 28px; border-right: 1px solid var(--border); }
+.stat-card:last-child { border-right: 0; }
+.stat-content { display: flex; flex-direction: column; gap: 12px; }
+.stat-value { font-size: 30px; font-weight: 600; color: var(--text); line-height: 1.2; font-variant-numeric: tabular-nums; }
+.stat-label { order: -1; font-size: 13px; color: var(--muted); }
+.charts-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; }
+.charts-grid .card { margin-bottom: 0; }
+.card-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 24px; }
+.card-header h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
+.card-header h3 > svg { width: 18px; height: 18px; color: var(--muted); }
+.header-actions { display: flex; max-width: 100%; }
+.search-input { width: 260px; }
+.status-chart { display: flex; flex-direction: column; gap: 16px; }
+.status-bar { display: flex; flex-direction: column; gap: 8px; }
+.status-info { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.status-label { color: var(--text); }
+.status-label small { margin-left: 6px; color: var(--muted); font-size: 11px; }
+.status-value { color: var(--muted); font-variant-numeric: tabular-nums; }
+.status-track { height: 8px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }
+.status-fill { height: 100%; background: var(--muted); border-radius: 3px; }
+.status-AC { background: var(--ok); }
+.empty-chart { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 40px; color: var(--muted); }
+/* 同一坐标下比较所有分数区间，窄屏保持五列，避免换行破坏比较关系。 */
+.score-distribution { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 18px; padding-top: 20px; }
+.score-bucket { display: flex; flex-direction: column; align-items: center; gap: 10px; min-width: 0; }
+.bucket-bar { width: 100%; height: 220px; display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--border); }
+.bucket-fill { width: 65%; min-width: 12px; background: var(--accent); border-radius: 3px 3px 0 0; }
+.bucket-label { font-size: 12px; white-space: nowrap; color: var(--text); }
+.bucket-count { font-size: 12px; color: var(--muted); }
+.activity-info { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+.activity-item { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; line-height: 1.7; }
+.activity-item > svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; color: var(--muted); }
+.table-container { overflow-x: auto; }
+.table-container table { border: 0; border-radius: 0; margin-bottom: 0; }
+.sort-button { padding: 0; min-height: 32px; border: 0; border-radius: 0; background: transparent; color: var(--muted); font-size: inherit; font-weight: inherit; white-space: nowrap; }
+.sort-button:hover { background: transparent; color: var(--text); }
+.sort-button > svg { width: 14px; height: 14px; }
+.rank-badge { font-variant-numeric: tabular-nums; color: var(--muted); }
+.score-badge { font-size: 14px; color: var(--text); }
+.progress-cell { display: flex; align-items: center; gap: 8px; font-variant-numeric: tabular-nums; }
+.mini-progress { width: 48px; height: 4px; background: var(--panel-2); border-radius: 2px; overflow: hidden; }
+.mini-fill { height: 100%; background: var(--accent); }
+.status-dist { min-width: 140px; }
+.mini-chip { display: inline-block; padding: 2px 5px; margin: 2px; border-radius: 4px; font-size: 11px; white-space: nowrap; background: var(--panel-2); color: var(--muted); }
 .chip-AC { background: var(--ok-soft); color: var(--ok); }
 .chip-WA { background: var(--danger-soft); color: var(--danger); }
-.chip-TLE { background: var(--warn-soft); color: var(--warn); }
-.chip-MLE { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
-.chip-CE { background: rgba(234, 179, 8, 0.1); color: #eab308; }
-.chip-RE { background: rgba(249, 115, 22, 0.1); color: #f97316; }
-
-/* 导出表单 */
-.export-form {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-group label {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.export-actions {
-  display: flex;
-  gap: 12px;
-}
-
-.btn-primary {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--accent);
-  color: #fff;
-}
-
-.btn-success {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  background: var(--ok);
-  color: #fff;
-}
-
-.export-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 12px;
-  padding: 10px 12px;
-  background: var(--accent-soft);
-  border: 1px solid var(--accent);
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--accent);
-}
-
-@media (max-width: 1024px) {
-  .overview-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-  
-  .activity-info {
-    grid-template-columns: 1fr;
-  }
-}
-
+.chip-TLE, .chip-MLE { background: var(--warn-soft); color: var(--warn); }
+.export-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 8px; }
+.form-group label { font-size: 13px; color: var(--muted); }
+.export-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+.btn-primary { background: var(--button-bg); color: #fff; }
+.btn-success { background: var(--panel); color: var(--text); border-color: var(--border-strong); }
+.btn-success:hover { background: var(--panel-2); color: var(--text); }
+.export-status { display: flex; align-items: center; gap: 6px; margin-top: 16px; font-size: 13px; color: var(--muted); }
+@media (max-width: 1000px) { .activity-info { grid-template-columns: 1fr; gap: 16px; } .stat-card { padding-inline: 20px; } }
 @media (max-width: 768px) {
-  .overview-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .score-distribution {
-    grid-template-columns: repeat(3, 1fr);
-  }
-  
-  .export-form {
-    grid-template-columns: 1fr;
-  }
+  .overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+  .stat-card { padding: 20px; }
+  .stat-card:nth-child(2n) { border-right: 0; }
+  .stat-card:nth-child(-n+2) { border-bottom: 1px solid var(--border); }
+  .stat-value { font-size: 26px; }
+  .charts-grid, .export-form { grid-template-columns: 1fr; }
+  .score-distribution { gap: 8px; }
+  .bucket-bar { height: 160px; }
+  .header-actions, .search-input { width: 100%; }
 }
 </style>
