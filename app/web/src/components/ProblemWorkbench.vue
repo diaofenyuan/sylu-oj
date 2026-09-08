@@ -1239,12 +1239,12 @@ onBeforeUnmount(() => {
   .wb-right { flex: none; min-height: 0; }
   .cm-wrap { flex: none; height: 340px; }
   .selftest-grid { grid-template-columns: 1fr; }
-  .wb-topbar { flex-wrap: wrap; gap: 8px; }
-  .tb-title { flex: 1; }
+  .wb-topbar { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+  .tb-title { width: 100%; }
   .tb-title strong { min-width: 0; }
   .tb-title .chip { flex-shrink: 0; }
-  .tb-nav { order: 1; margin-left: 0; }
-  .tb-progress { order: 1; margin-left: auto; white-space: nowrap; }
+  .tb-nav { grid-column: 1; grid-row: 2; margin-left: 0; }
+  .tb-progress { grid-column: 2; grid-row: 2; justify-self: end; white-space: nowrap; }
   .assign-meta { flex-wrap: wrap; gap: 6px 12px; padding: 12px 16px; }
   .assign-title { flex-basis: 100%; }
   .pr-scroll { flex: none; overflow: visible; }
