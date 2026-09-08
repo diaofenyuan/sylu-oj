@@ -2,12 +2,13 @@ package oj.judge;
 
 import oj.shared.ApiException;
 import oj.shared.ErrorCode;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicReference;
@@ -29,8 +30,17 @@ public class JudgeRunService {
                                    boolean timedOut, String sandboxMode) {
     }
 
-    private static final long WAIT_TIMEOUT_SECONDS = 60;
-    private static final int MAX_PENDING_RUNS = 64;
+    private final long waitTimeoutSeconds;
+    private final Semaphore capacity;
+
+    public JudgeRunService(@Value("${oj.judge.run-max-pending:64}") int maxPendingRuns,
+                           @Value("${oj.judge.run-wait-timeout-seconds:60}") long waitTimeoutSeconds) {
+        if (maxPendingRuns <= 0 || waitTimeoutSeconds <= 0) {
+            throw new IllegalArgumentException("自测队列容量和等待超时必须大于零");
+        }
+        this.capacity = new Semaphore(maxPendingRuns);
+        this.waitTimeoutSeconds = waitTimeoutSeconds;
+    }
 
     private static final class PendingRun {
         final RunTaskPayload payload;
@@ -48,7 +58,8 @@ public class JudgeRunService {
     /** 入队并等待沙盒结果；agent 不可用或超时抛 INTERNAL_ERROR（HTTP 层映射 500/超时提示）。 */
     public RunResultPayload execute(String language, String languageRuntime, String judgeConfig,
                                     String code, String input) {
-        if (pending.size() >= MAX_PENDING_RUNS) {
+        // 用原子配额覆盖排队和执行阶段，避免并发请求同时通过 size 检查。
+        if (!capacity.tryAcquire()) {
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "自测运行队列已满，请稍后重试");
         }
         String runUuid = java.util.UUID.randomUUID().toString();
@@ -58,26 +69,27 @@ public class JudgeRunService {
         pending.put(runUuid, run);
         queue.add(payload);
         try {
-            RunResultPayload result = run.future.get(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
+            RunResultPayload result = run.future.get(waitTimeoutSeconds, TimeUnit.SECONDS);
             return result;
         } catch (TimeoutException e) {
-            pending.remove(runUuid);
             throw new ApiException(ErrorCode.INTERNAL_ERROR,
                     "自测运行等待超时：判题代理繁忙或不可用，请稍后重试");
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            pending.remove(runUuid);
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "自测运行被中断");
         } catch (java.util.concurrent.ExecutionException e) {
-            pending.remove(runUuid);
             throw new ApiException(ErrorCode.INTERNAL_ERROR, "自测运行内部错误："
                     + (e.getCause() == null ? e.getMessage() : e.getCause().getMessage()));
+        } finally {
+            // Agent 离线时也必须移除队列中的源码和输入，不能依赖下一次领取清理。
+            pending.remove(runUuid, run);
+            queue.remove(payload);
+            capacity.release();
         }
     }
 
     /** Agent 领取：出队并在 pending 表标记认领人；无效/已被认领的条目直接跳过。 */
     public RunTaskPayload claim(String agentId) {
-        LocalDateTime now = LocalDateTime.now();
         while (true) {
             RunTaskPayload payload = queue.poll();
             if (payload == null) {
@@ -87,7 +99,7 @@ public class JudgeRunService {
             if (run == null) {
                 continue; // 已超时清理，跳过
             }
-            if (!run.claimedBy.compareAndSet(null, agentId + "@" + now)) {
+            if (!run.claimedBy.compareAndSet(null, agentId)) {
                 continue;
             }
             return payload;
@@ -97,10 +109,10 @@ public class JudgeRunService {
     /** Agent 回传结果：校验认领人后完成等待方并移除条目。 */
     public RunResultPayload complete(String agentId, String runUuid, RunResultPayload result) {
         PendingRun run = pending.get(runUuid);
-        if (run == null || !run.claimedBy.get().startsWith(agentId)) {
+        if (run == null || agentId == null || !agentId.equals(run.claimedBy.get())
+                || !pending.remove(runUuid, run)) {
             throw new ApiException(ErrorCode.AGENT_UNAUTHORIZED, "自测运行任务不存在或认领方不符");
         }
-        pending.remove(runUuid);
         run.future.complete(new RunResultPayload(runUuid, result.output(), result.stderr(),
                 result.compileError(), result.exitCode(), result.totalTimeMs(),
                 result.peakMemoryKb(), result.timedOut(), result.sandboxMode()));
