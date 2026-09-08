@@ -94,10 +94,13 @@ public class JudgeResultService {
                         tc.score() == null ? BigDecimal.ZERO : tc.score(), tc.timeMs(), tc.memoryKb()));
             }
         }
-        // SE 回退提交计数：判题系统错误不消耗学生提交次数
-        if ("SE".equals(command.resultCode())) {
+        // 退还标记与计数同事务保存，自动重试或人工复判不得重复退还同一次提交。
+        if ("SE".equals(command.resultCode()) && !submission.isAttemptRefunded()) {
             counterRepository.lockCounter(submission.getAssignmentTargetId(), submission.getStudentId())
-                    .ifPresent(SubmissionCounter::decrement);
+                    .ifPresent(counter -> {
+                        counter.decrement();
+                        submission.markAttemptRefunded();
+                    });
         }
         submission.updateJudgeStatus(command.resultCode());
         // 显式 flush：分析视图（@Immutable）查询不会自动触发 flush，

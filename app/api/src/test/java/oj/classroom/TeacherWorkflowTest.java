@@ -383,6 +383,33 @@ class TeacherWorkflowTest extends TestSupport {
     // ---------------- 分析与排名 ----------------
 
     @Test
+    void system_error_refunds_each_submission_only_once_across_rejudges() {
+        Assignment assignment = setupAssignableHomework(3);
+        Long targetId = targetFor(assignment.getId(), classA).getId();
+        Long problemId = assignmentService.composition(assignment.getId()).get(0).getProblemId();
+        Submission failed = submit(s1, targetId, problemId, "failed");
+        submit(s1, targetId, problemId, "other");
+        var counter = counterRepository.lockCounter(targetId, s1).orElseThrow();
+        assertThat(counter.getAttemptCount()).isEqualTo(2);
+        judgeResultService.record(new JudgeResultService.ResultCommand(
+                failed.getId(), "SE", BigDecimal.ZERO, 0, 0, 1, "agent-1", null, null));
+        assertThat(counter.getAttemptCount()).isEqualTo(1);
+        assertThat(failed.isAttemptRefunded()).isTrue();
+        // 中间允许正常提交，后续 SE 不能把其他提交消耗的额度退掉。
+        submit(s1, targetId, problemId, "after-refund");
+        judgeResultService.record(new JudgeResultService.ResultCommand(
+                failed.getId(), "SE", BigDecimal.ZERO, 0, 0, 2, "agent-1", null, null));
+        assertThat(counter.getAttemptCount()).isEqualTo(2);
+        judgeResultService.record(new JudgeResultService.ResultCommand(
+                failed.getId(), "AC", new BigDecimal("100"), 10, 100, 3, "agent-1", null, null));
+        judgeResultService.record(new JudgeResultService.ResultCommand(
+                failed.getId(), "SE", BigDecimal.ZERO, 0, 0, 4, "agent-1", null, null));
+        assertThat(counter.getAttemptCount()).isEqualTo(2);
+        assertThat(jdbcTemplate.queryForObject("SELECT attempt_refunded FROM submission WHERE id = ?",
+                Boolean.class, failed.getId())).isTrue();
+    }
+
+    @Test
     void competition_ranking_with_ties() {
         Assignment assignment = setupAssignableHomework(10);
         AssignmentTarget target = targetFor(assignment.getId(), classA);

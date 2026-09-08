@@ -53,6 +53,9 @@ public class Submission {
     @Column(name = "judge_status", nullable = false, length = 4)
     private String judgeStatus = PENDING;
 
+    @Column(name = "attempt_refunded", nullable = false)
+    private boolean attemptRefunded = false;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
@@ -124,6 +127,14 @@ public class Submission {
 
     public void updateJudgeStatus(String judgeStatus) {
         this.judgeStatus = judgeStatus;
+    }
+
+    public boolean isAttemptRefunded() {
+        return attemptRefunded;
+    }
+
+    public void markAttemptRefunded() {
+        this.attemptRefunded = true;
     }
 
     public LocalDateTime getCreatedAt() {
