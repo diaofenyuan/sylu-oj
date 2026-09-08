@@ -51,6 +51,7 @@ public class TeacherController {
     private final oj.export.ExportScheduler exportScheduler;
     private final AccessGuard accessGuard;
     private final java.time.Clock clock;
+    private final oj.practice.PracticeCatalogService practiceCatalogService;
 
     public TeacherController(ClassroomService classroomService,
                              ProblemService problemService,
@@ -59,7 +60,8 @@ public class TeacherController {
                              GradeExportService exportService,
                              oj.export.ExportScheduler exportScheduler,
                              AccessGuard accessGuard,
-                             java.time.Clock clock) {
+                             java.time.Clock clock,
+                             oj.practice.PracticeCatalogService practiceCatalogService) {
         this.classroomService = classroomService;
         this.problemService = problemService;
         this.assignmentService = assignmentService;
@@ -68,6 +70,7 @@ public class TeacherController {
         this.exportScheduler = exportScheduler;
         this.accessGuard = accessGuard;
         this.clock = clock;
+        this.practiceCatalogService = practiceCatalogService;
     }
 
     // ---------------- 请求体 ----------------
@@ -143,6 +146,7 @@ public class TeacherController {
 
     @GetMapping("/problem-banks")
     public List<ProblemBank> banks(@RequestParam Long teachingClassId) {
+        practiceCatalogService.ensureForTeachingClass(teachingClassId);
         return problemService.listBanks(teachingClassId);
     }
 
@@ -181,7 +185,8 @@ public class TeacherController {
             item.put("id", p.getId());
             item.put("code", p.getCode());
             item.put("title", p.getTitle());
-            item.put("languages", p.getLanguages());
+            item.put("languages", List.of(p.getLanguages().split(",")));
+            item.put("difficulty", p.getDifficulty());
             item.put("status", p.getStatus().name());
             item.put("version", p.getVersion());
             result.add(item);

@@ -23,15 +23,26 @@
       <div v-if="errMsg" class="err-banner" role="alert">{{ errMsg }}</div>
     </div>
 
-    <div class="page-toolbar"><span class="muted">共 {{ problems.length }} 道题目</span><label class="search-field"><span class="sr-only">搜索班级题库</span><Icon icon="mdi:magnify" aria-hidden="true" /><input v-model.trim="keyword" type="search" placeholder="搜索题号或题目名称" /></label></div>
+    <div class="page-toolbar">
+      <label class="form-field">题库<select v-model="bankId" :disabled="loading || saving" @change="loadProblems">
+        <option v-for="bank in banks" :key="bank.id" :value="bank.id">{{ bank.name }}</option>
+      </select></label>
+      <label class="form-field">难度<select v-model="difficulty">
+        <option value="">全部难度</option>
+        <option v-for="(label, value) in DIFFICULTY" :key="value" :value="value">{{ label }}</option>
+      </select></label>
+      <span class="muted">共 {{ problems.length }} 道题目，当前显示 {{ filteredProblems.length }} 道</span>
+      <label class="search-field"><span class="sr-only">搜索班级题库</span><Icon icon="mdi:magnify" aria-hidden="true" /><input v-model.trim="keyword" type="search" placeholder="搜索题号或题目名称" /></label>
+    </div>
     <p v-if="loading" role="status" class="muted">正在加载题库…</p>
     <div v-if="loadError" class="error-banner" role="alert"><span>{{ loadError }}</span><button class="secondary" :disabled="loading" @click="load">重新加载</button></div>
     <table v-if="filteredProblems.length">
-      <thead><tr><th>题号</th><th>题名</th><th>语言</th><th>状态</th><th>版本</th><th></th></tr></thead>
+      <thead><tr><th>题号</th><th>题名</th><th>难度</th><th>语言</th><th>状态</th><th>版本</th><th></th></tr></thead>
       <tbody>
         <tr v-for="p in filteredProblems" :key="p.id">
           <td><code>{{ p.code }}</code></td>
           <td><strong>{{ p.title }}</strong></td>
+          <td>{{ DIFFICULTY[p.difficulty] || p.difficulty }}</td>
           <td>{{ (p.languages || []).join(' / ') }}</td>
           <td>
             <span class="chip" :class="p.status === 'PUBLISHED' ? 'chip-ok' : 'chip-warn'">
@@ -60,11 +71,16 @@ const problems = ref([])
 const form = ref({ code: '', title: '', language: 'CPP' })
 const errMsg = ref('')
 const bankId = ref(null)
+const banks = ref([])
+const difficulty = ref('')
+const DIFFICULTY = { EASY: '入门', BASIC: '基础', INTERMEDIATE: '进阶', HARD: '困难' }
 const keyword = ref('')
 const loading = ref(true)
 const saving = ref(false)
 const loadError = ref('')
-const filteredProblems = computed(() => problems.value.filter(p => (p.code + ' ' + p.title).toLowerCase().includes(keyword.value.toLowerCase())))
+const filteredProblems = computed(() => problems.value.filter(p =>
+  (!difficulty.value || p.difficulty === difficulty.value) &&
+  (p.code + ' ' + p.title).toLowerCase().includes(keyword.value.toLowerCase())))
 
 const STATUS = { DRAFT: '草稿', PUBLISHED: '已发布' }
 function statusText(s) {
@@ -75,14 +91,27 @@ async function load() {
   loading.value = true
   loadError.value = ''
   try {
-    const banks = await api(`/teacher/problem-banks?teachingClassId=${classId}`)
-    bankId.value = banks[0]?.id
+    banks.value = await api(`/teacher/problem-banks?teachingClassId=${classId}`)
+    if (!banks.value.some(bank => bank.id === bankId.value)) {
+      bankId.value = banks.value.find(bank => bank.name === '系统刷题题库')?.id || banks.value[0]?.id
+    }
     if (!bankId.value) {
       const bank = await api('/teacher/problem-banks', {
         method: 'POST', body: { teachingClassId: Number(classId), name: '默认题库' }
       })
       bankId.value = bank.id
+      banks.value.push(bank)
     }
+    problems.value = await api(`/teacher/problems?bankId=${bankId.value}`)
+  } catch (e) { loadError.value = e.message || '题库加载失败' }
+  finally { loading.value = false }
+}
+
+async function loadProblems() {
+  loading.value = true
+  loadError.value = ''
+  problems.value = []
+  try {
     problems.value = await api(`/teacher/problems?bankId=${bankId.value}`)
   } catch (e) { loadError.value = e.message || '题库加载失败' }
   finally { loading.value = false }

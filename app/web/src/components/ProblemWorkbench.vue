@@ -732,7 +732,11 @@ async function selectProblem(problemId) {
     if (version !== selectionVersion) return
     selected.value = problem
     if (!selected.value) return
-    language.value = selected.value.languages?.[0] || 'CPP'
+    // 切题保留当前语言，仅在新题不支持时回退到该题的首选语言。
+    const availableLanguages = selected.value.languages || langs
+    if (!availableLanguages.includes(language.value)) {
+      language.value = availableLanguages[0] || 'CPP'
+    }
     const firstSample = selected.value.samples?.[0]
     selfTestInput.value = firstSample?.input || ''
     setEditorDoc(loadCodeFor(problemId, language.value), true)
@@ -741,6 +745,8 @@ async function selectProblem(problemId) {
       if (version !== selectionVersion) return
       mountEditor()
     }
+    // 题目和草稿就绪后即可切换语言，提交记录加载不应锁住编辑器。
+    problemLoading.value = false
     await refreshSubmissionStatus()
   } catch (error) {
     if (version === selectionVersion) loadError.value = error.message || '题目加载失败，请重试'

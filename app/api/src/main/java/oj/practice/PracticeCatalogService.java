@@ -24,6 +24,7 @@ import oj.problem.TestcaseSet;
 import oj.problem.TestcaseSetRepository;
 import oj.shared.ApiException;
 import oj.shared.ErrorCode;
+import oj.shared.AccessGuard;
 import oj.submission.JudgeResultRepository;
 import oj.submission.Submission;
 import oj.submission.SubmissionRepository;
@@ -34,7 +35,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
@@ -49,7 +49,8 @@ public class PracticeCatalogService {
 
     public static final String BANK_NAME = "系统刷题题库";
     public static final String ASSIGNMENT_TITLE = "系统刷题中心";
-    private static final String PRACTICE_SCORING_RULES = "{\"catalog\":\"SYLU_OJ_PRACTICE_V2\",\"policy\":\"bestScore\"}";
+    private static final String PRACTICE_SCORING_RULES = "{\"catalog\":\"SYLU_OJ_PRACTICE_V3\",\"policy\":\"bestScore\"}";
+    private static final String LEGACY_SCORING_RULES = "{\"catalog\":\"SYLU_OJ_PRACTICE_V2\",\"policy\":\"bestScore\"}";
     private static final List<String> LEVELS = List.of("EASY", "BASIC", "INTERMEDIATE", "HARD");
     private static final List<String> LANGUAGES = List.of("C", "CPP", "PYTHON", "JAVA");
 
@@ -67,6 +68,7 @@ public class PracticeCatalogService {
     private final SubmissionRepository submissionRepository;
     private final JudgeResultRepository judgeResultRepository;
     private final ObjectMapper objectMapper;
+    private final AccessGuard accessGuard;
 
     public PracticeCatalogService(ClassroomService classroomService,
                                   TeacherAssignmentRepository teacherAssignmentRepository,
@@ -81,7 +83,7 @@ public class PracticeCatalogService {
                                   ProblemSnapshotRepository snapshotRepository,
                                   SubmissionRepository submissionRepository,
                                   JudgeResultRepository judgeResultRepository,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper, AccessGuard accessGuard) {
         this.classroomService = classroomService;
         this.teacherAssignmentRepository = teacherAssignmentRepository;
         this.teachingClassRepository = teachingClassRepository;
@@ -96,6 +98,7 @@ public class PracticeCatalogService {
         this.submissionRepository = submissionRepository;
         this.judgeResultRepository = judgeResultRepository;
         this.objectMapper = objectMapper;
+        this.accessGuard = accessGuard;
     }
 
     public record Sample(int orderNum, String input, String expectedOutput) {
@@ -109,11 +112,11 @@ public class PracticeCatalogService {
 
     @Transactional
     public List<PracticeProblem> listProblems(Long studentId, String difficulty) {
-        Catalog catalog = ensureCatalog(studentId);
         String normalized = difficulty == null ? null : difficulty.trim().toUpperCase(Locale.ROOT);
         if (normalized != null && !normalized.isBlank() && !LEVELS.contains(normalized)) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED, "不支持的题目难度");
         }
+        Catalog catalog = ensureCatalog(studentId);
         return catalog.snapshots().stream()
                 .map(snapshot -> toProblem(catalog.target().getId(), studentId, snapshot,
                         normalized != null && !normalized.isBlank()))
@@ -184,7 +187,25 @@ public class PracticeCatalogService {
 
     private Catalog ensureCatalog(Long studentId) {
         StudentEnrollment enrollment = classroomService.requireActiveEnrollmentAny(studentId);
-        Long classId = enrollment.getTeachingClassId();
+        return ensureClassCatalog(enrollment.getTeachingClassId());
+    }
+
+    /** 教师首次打开题库即可初始化，不再依赖先有学生访问。 */
+    @Transactional
+    public void ensureForTeachingClass(Long classId) {
+        var user = accessGuard.requireAdminOrTeacher();
+        if (user.isTeacher()) {
+            classroomService.requireActiveAssignment(user.teacherId(), classId);
+        }
+        // 未配置主讲教师时仍允许维护自建题库，学生刷题入口继续执行配置校验。
+        if (teacherAssignmentRepository.findByTeachingClassIdAndActiveMarkerIsNotNullOrderByIdAsc(classId)
+                .stream().noneMatch(item -> item.getRole() == TeacherAssignment.Role.PRIMARY)) {
+            return;
+        }
+        ensureClassCatalog(classId);
+    }
+
+    private Catalog ensureClassCatalog(Long classId) {
         // 对教学班加悲观锁，保证多学生首次访问时只有一个线程创建系统目录。
         teachingClassRepository.findByIdForUpdate(classId)
                 .orElseThrow(() -> new ApiException(ErrorCode.NOT_FOUND, "教学班不存在"));
@@ -193,10 +214,11 @@ public class PracticeCatalogService {
                 .filter(target -> assignmentRepository.findById(target.getAssignmentId())
                         .filter(assignment -> ASSIGNMENT_TITLE.equals(assignment.getTitle())
                                 && assignment.getMode() == Assignment.Mode.HOMEWORK)
-                        .map(assignment -> isPracticeCatalog(assignment, target))
+                        .map(assignment -> PRACTICE_SCORING_RULES.equals(target.getScoringRules())
+                                || LEGACY_SCORING_RULES.equals(target.getScoringRules()))
                         .orElse(false))
                 .findFirst().orElse(null);
-        if (existing != null) {
+        if (existing != null && isPracticeCatalog(existing)) {
             return new Catalog(existing, snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(existing.getAssignmentId()));
         }
 
@@ -209,13 +231,28 @@ public class PracticeCatalogService {
                 .filter(item -> BANK_NAME.equals(item.getName())).findFirst()
                 .orElseGet(() -> bankRepository.save(new ProblemBank(classId, BANK_NAME, "系统提供的分级刷题题库")));
 
-        List<Problem> problems = new ArrayList<>();
+        // 目录升级沿用原作业目标及快照，保留学生历史成绩、草稿题号和提交记录。
+        Assignment assignment = existing == null
+                ? assignmentRepository.save(new Assignment(ASSIGNMENT_TITLE, Assignment.Mode.HOMEWORK, teacher.getTeacherId()))
+                : assignmentRepository.findById(existing.getAssignmentId()).orElseThrow();
+        List<ProblemSnapshot> oldSnapshots = snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(assignment.getId());
+        java.util.Set<Long> included = oldSnapshots.stream().map(ProblemSnapshot::getProblemId)
+                .collect(java.util.stream.Collectors.toSet());
+        List<AssignmentProblem> composition = assignmentProblemRepository.findByAssignmentIdOrderByOrderNumAsc(assignment.getId());
+        java.util.Set<Long> composed = composition
+                .stream().map(AssignmentProblem::getProblemId).collect(java.util.stream.Collectors.toSet());
+        int order = composition
+                .stream().mapToInt(AssignmentProblem::getOrderNum).max().orElse(0) + 1;
         for (int level = 0; level < LEVELS.size(); level++) {
             String levelName = LEVELS.get(level);
-            for (int index = 1; index <= 25; index++) {
+            for (int index = 1; index <= PracticeQuestionCatalog.size(level); index++) {
                 PracticeQuestionCatalog.Question question = PracticeQuestionCatalog.question(level, index);
                 String code = "PRACTICE-" + levelName + "-" + String.format("%02d", index);
-                Problem problem = problemRepository.findByProblemBankIdAndCode(bank.getId(), code)
+                Problem currentProblem = problemRepository.findByProblemBankIdAndCode(bank.getId(), code).orElse(null);
+                if (currentProblem != null && included.contains(currentProblem.getId())) {
+                    continue;
+                }
+                Problem problem = java.util.Optional.ofNullable(currentProblem)
                         .map(current -> {
                             current.updateTitle(question.title());
                             current.updateDescription(question.description());
@@ -227,42 +264,44 @@ public class PracticeCatalogService {
                                 BigDecimal.valueOf(100), teacher.getTeacherId()));
                 problem.publish();
                 problem = problemRepository.save(problem);
-                // 每个版本生成新的用例集合：1 个公开样例，做对满分 100 分。
+                // 用整数分配测试点分值，避免判题端整数解析或舍入导致满分不足 100。
                 int version = testcaseSetRepository.findFirstByProblemIdOrderByVersionDesc(problem.getId())
                         .map(TestcaseSet::getVersion).orElse(0) + 1;
                 TestcaseSet set = testcaseSetRepository.save(new TestcaseSet(problem.getId(), version));
-                testcaseRepository.save(new Testcase(set.getId(), 1, true,
-                        question.sampleInput(), question.sampleOutput(), BigDecimal.valueOf(100)));
-                problems.add(problem);
+                int count = question.testcases().size();
+                for (int caseIndex = 0; caseIndex < count; caseIndex++) {
+                    var tc = question.testcases().get(caseIndex);
+                    int score = 100 / count + (caseIndex < 100 % count ? 1 : 0);
+                    testcaseRepository.save(new Testcase(set.getId(), caseIndex + 1, tc.sample(),
+                            tc.input(), tc.expectedOutput(), BigDecimal.valueOf(score)));
+                }
+                if (!composed.contains(problem.getId())) {
+                    assignmentProblemRepository.save(new AssignmentProblem(assignment.getId(), problem.getId(), order++, BigDecimal.ONE));
+                }
+                snapshotRepository.save(new ProblemSnapshot(assignment.getId(), problem.getId(), problem.getVersion(), set.getId(),
+                        problem.getTitle(), problem.getDescription(), problem.getLanguages(), judgeConfig(problem), checksum(problem, set)));
             }
         }
 
-        Assignment assignment = assignmentRepository.save(new Assignment(ASSIGNMENT_TITLE,
-                Assignment.Mode.HOMEWORK, teacher.getTeacherId()));
-        int order = 1;
-        for (Problem problem : problems) {
-            assignmentProblemRepository.save(new AssignmentProblem(assignment.getId(), problem.getId(), order++, BigDecimal.ONE));
-        }
         LocalDateTime now = LocalDateTime.now();
-        AssignmentTarget target = targetRepository.save(new AssignmentTarget(assignment.getId(), classId,
-                now.minusMinutes(1), now.plusYears(10), 1000, PRACTICE_SCORING_RULES));
-        assignment.publish();
-        for (Problem problem : problems) {
-            TestcaseSet set = testcaseSetRepository.findFirstByProblemIdOrderByVersionDesc(problem.getId()).orElseThrow();
-            snapshotRepository.save(new ProblemSnapshot(assignment.getId(), problem.getId(), problem.getVersion(), set.getId(),
-                    problem.getTitle(), problem.getDescription(), problem.getLanguages(), judgeConfig(problem), checksum(problem, set)));
+        AssignmentTarget target = existing;
+        if (target == null) {
+            target = targetRepository.save(new AssignmentTarget(assignment.getId(), classId,
+                    now.minusMinutes(1), now.plusYears(10), 1000, PRACTICE_SCORING_RULES));
+        } else {
+            target.updateRules(null, null, 0, PRACTICE_SCORING_RULES);
         }
+        assignment.publish();
         return new Catalog(target, snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(assignment.getId()));
     }
 
-    /** 仅认领由本服务生成的最新版（V2）固定 100 题目录；
-     * 旧版占位目录（V1）不匹配，将在下一次访问时被替换重建。 */
-    private boolean isPracticeCatalog(Assignment assignment, AssignmentTarget target) {
+    /** 用资源题目数量校验完整性；缺失的题目在班级锁内补齐。 */
+    private boolean isPracticeCatalog(AssignmentTarget target) {
         if (!PRACTICE_SCORING_RULES.equals(target.getScoringRules())) {
             return false;
         }
-        List<ProblemSnapshot> snapshots = snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(assignment.getId());
-        if (snapshots.size() != LEVELS.size() * 25) {
+        List<ProblemSnapshot> snapshots = snapshotRepository.findByAssignmentIdOrderByProblemIdAsc(target.getAssignmentId());
+        if (snapshots.size() != PracticeQuestionCatalog.totalSize()) {
             return false;
         }
         java.util.Set<String> codes = new java.util.HashSet<>();
@@ -280,13 +319,14 @@ public class PracticeCatalogService {
                 return false;
             }
             int questionNumber = Integer.parseInt(problem.getCode().substring(expectedPrefix.length()));
-            if (questionNumber < 1 || questionNumber > 25) {
+            if (questionNumber < 1 || questionNumber > PracticeQuestionCatalog.size(LEVELS.indexOf(problem.getDifficulty()))) {
                 return false;
             }
             levelCounts.merge(problem.getDifficulty(), 1, Integer::sum);
         }
-        return codes.size() == LEVELS.size() * 25
-                && LEVELS.stream().allMatch(level -> levelCounts.getOrDefault(level, 0) == 25);
+        return codes.size() == PracticeQuestionCatalog.totalSize()
+                && LEVELS.stream().allMatch(level -> levelCounts.getOrDefault(level, 0)
+                == PracticeQuestionCatalog.size(LEVELS.indexOf(level)));
     }
 
     private String judgeConfig(Problem problem) {

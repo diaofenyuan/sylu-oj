@@ -1,16 +1,26 @@
 package oj.practice;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 系统刷题题库题目池：EASY/BASIC/INTERMEDIATE/HARD 每级 25 道，共 100 道。
- * 每题包含标题、题目描述（含输入/输出格式约定）与 1 个公开样例；
- * 判题只有该样例一个测试点，做对即得满分 100 分。
- * 判题按输出整串归一化（去尾空白）后精确比对，题面与样例需严格对应。
+ * 系统题库每级 75 道，共 300 道。保留原有题号，扩展题从资源加载。
+ * 扩展题的隐藏用例由离线参考算法生成，学生接口只返回公开样例。
  */
 public final class PracticeQuestionCatalog {
 
-    public record Question(String title, String description, String sampleInput, String sampleOutput) {
+    public record Case(String input, String expectedOutput, boolean sample) {
+    }
+
+    public record Question(String title, String description, List<Case> testcases) {
+    }
+
+    private record ExtendedQuestion(String difficulty, String title, String topic, String description,
+                                    String code, List<Case> testcases) {
     }
 
     private static final List<Question> EASY = List.of(
@@ -873,17 +883,59 @@ public final class PracticeQuestionCatalog {
                     "4\n2 7 9 3", "11")
     );
 
-    private static final List<List<Question>> LEVELS = List.of(EASY, BASIC, INTERMEDIATE, HARD);
+    private static final List<List<Question>> LEVELS = loadLevels();
 
     private PracticeQuestionCatalog() {
     }
 
-    /** 按难度顺序（0=EASY，1=BASIC，2=INTERMEDIATE，3=HARD）与题号（1-25）取题。 */
+    public static int size(int levelOrder) {
+        return LEVELS.get(levelOrder).size();
+    }
+
+    public static int totalSize() {
+        return LEVELS.stream().mapToInt(List::size).sum();
+    }
+
+    /** 按难度顺序（0=EASY，1=BASIC，2=INTERMEDIATE，3=HARD）与稳定题号取题。 */
     public static Question question(int levelOrder, int index) {
         return LEVELS.get(levelOrder).get(index - 1);
     }
 
     private static Question q(String title, String description, String sampleInput, String sampleOutput) {
-        return new Question(title, description, sampleInput, sampleOutput);
+        return new Question(title, description, List.of(new Case(sampleInput, sampleOutput, true)));
+    }
+
+    private static List<List<Question>> loadLevels() {
+        List<List<Question>> levels = new ArrayList<>();
+        for (List<Question> legacy : List.of(EASY, BASIC, INTERMEDIATE, HARD)) {
+            levels.add(new ArrayList<>(legacy));
+        }
+        List<String> names = List.of("EASY", "BASIC", "INTERMEDIATE", "HARD");
+        try (var input = PracticeQuestionCatalog.class.getResourceAsStream("/practice/extended-catalog.json")) {
+            if (input == null) throw new IllegalStateException("缺少扩展题库资源");
+            List<ExtendedQuestion> entries = new ObjectMapper().readValue(input, new TypeReference<>() {});
+            for (ExtendedQuestion entry : entries) {
+                int level = names.indexOf(entry.difficulty());
+                if (level < 0 || entry.title() == null || entry.title().isBlank()
+                        || entry.description() == null || entry.description().isBlank()
+                        || entry.testcases() == null || entry.testcases().size() < 5
+                        || entry.testcases().stream().filter(Case::sample).count() != 1
+                        || entry.testcases().stream().anyMatch(c -> c.input() == null || c.expectedOutput() == null)) {
+                    throw new IllegalStateException("扩展题目不完整：" + entry.code());
+                }
+                int index = levels.get(level).size() + 1;
+                if (!entry.code().equals("PRACTICE-" + entry.difficulty() + "-" + String.format("%02d", index))) {
+                    throw new IllegalStateException("扩展题号不连续：" + entry.code());
+                }
+                levels.get(level).add(new Question(entry.title(), entry.description(), List.copyOf(entry.testcases())));
+            }
+            if (levels.stream().anyMatch(list -> list.size() != 75)
+                    || levels.stream().flatMap(List::stream).map(Question::title).distinct().count() != 300) {
+                throw new IllegalStateException("扩展题库数量或标题不符合约定");
+            }
+            return levels.stream().map(List::copyOf).toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("无法读取扩展题库", e);
+        }
     }
 }
