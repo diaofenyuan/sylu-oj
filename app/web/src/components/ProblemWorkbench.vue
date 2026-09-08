@@ -1,5 +1,8 @@
 <template>
   <div class="oj-workbench">
+    <div v-if="loadError" class="workbench-error" role="alert">
+      {{ loadError }} <button class="mini-btn" @click="loadProblems">重新加载</button>
+    </div>
     <!-- 顶部工具条 -->
     <div class="wb-topbar">
       <button class="tb-btn" @click="drawer = true">
@@ -80,10 +83,11 @@
       <section class="wb-right">
         <div class="code-toolbar">
           <span class="file-tab" :style="{ '--dot': langDot }">{{ fileName }}</span>
-          <select v-model="language" aria-label="选择编程语言">
+          <select v-model="language" aria-label="选择编程语言" :disabled="!selected || problemLoading">
             <option v-for="item in selected?.languages || langs" :key="item" :value="item">{{ langName(item) }}</option>
           </select>
-          <span class="mode-tag">ACM 模式 · stdin/stdout</span>
+          <span class="mode-tag" role="status">{{ draftStatus }}</span>
+          <button v-if="legacyDraft !== null" class="tb-btn" @click="restoreLegacyDraft">恢复旧版草稿</button>
           <span class="spacer"></span>
           <button class="tb-btn" @click="showTemplates = true">
             <Icon icon="mdi:code-braces" />
@@ -103,7 +107,7 @@
           </button>
         </div>
 
-        <div class="cm-wrap">
+        <div class="cm-wrap" :inert="problemLoading || !selected">
           <div ref="cmHost" class="cm-host"></div>
         </div>
 
@@ -296,6 +300,7 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
+import { createDraftStore } from '../composables/draftStore'
 import { useJudgeStatus } from '../composables/useJudgeStatus'
 import CaseDetails from './CaseDetails.vue'
 import ErrorDiagnostics from './ErrorDiagnostics.vue'
@@ -329,7 +334,7 @@ const props = defineProps({
 })
 const isAssignment = computed(() => props.mode === 'assignment')
 const canSubmitNow = computed(() =>
-  !isAssignment.value || (props.meta && props.meta.window === 'OPEN'))
+  !problemLoading.value && (!isAssignment.value || (props.meta && props.meta.window === 'OPEN')))
 
 // VS Code Dark+ 风格的主题
 const vscodeTheme = [
@@ -405,6 +410,8 @@ const difficulty = ref('')
 const keyword = ref('')
 const statusFilter = ref('ALL')
 const loading = ref(true)
+const problemLoading = ref(false)
+const loadError = ref('')
 const drawer = ref(false)
 
 const language = ref('CPP')
@@ -424,6 +431,13 @@ const showShortcuts = ref(false)
 const showLeaderboard = ref(false)
 const caseDetails = ref([])
 const myUserId = ref(0)
+const draftStatus = ref('草稿仅保存在此浏览器')
+const legacyDraft = ref(null)
+const drafts = createDraftStore(() => localStorage, () => {
+  draftStatus.value = '本机保存失败，请复制代码备份'
+})
+let selectionVersion = 0
+let replacingDocument = false
 
 const cmHost = ref(null)
 let editorView = null
@@ -488,16 +502,28 @@ function levelPassed(key) { return problems.value.filter(problem => problem.diff
 function stateText(status) { return getStatusText(status) }
 function stateClass(status) { return getStatusClass(status) }
 function langName(value) { return ({ C: 'C', CPP: 'C++', PYTHON: 'Python', JAVA: 'Java' })[value] || value }
-function draftKey(id, lang) { return `oj-practice-draft-${id}-${lang || ''}` }
+function draftContext(problemId, lang) {
+  return { userId: myUserId.value, mode: props.mode, targetId: props.targetId, problemId, language: lang }
+}
+function saveDraft() {
+  if (!selected.value || !myUserId.value) return false
+  const saved = drafts.save(draftContext(selected.value.problemId, language.value), code.value)
+  if (saved) draftStatus.value = '草稿已保存到本机'
+  return saved
+}
 function loadCodeFor(problemId, lang) {
-  const saved = localStorage.getItem(draftKey(problemId, lang))
-  if (saved) return saved
-  const legacy = localStorage.getItem(`oj-practice-draft-${problemId}`)
-  if (legacy) {
-    localStorage.setItem(draftKey(problemId, lang), legacy)
-    return legacy
-  }
-  return CODE_TEMPLATES[lang] || ''
+  draftStatus.value = '草稿仅保存在此浏览器'
+  const saved = drafts.read(draftContext(problemId, lang))
+  legacyDraft.value = saved === null ? drafts.readLegacy(problemId, lang) : null
+  if (saved !== null) draftStatus.value = '已恢复本机草稿'
+  return saved ?? CODE_TEMPLATES[lang] ?? ''
+}
+function restoreLegacyDraft() {
+  if (legacyDraft.value === null || !selected.value || problemLoading.value) return
+  if (!window.confirm('旧版草稿没有账号和作业标识，请确认属于你本人。恢复后将替换当前代码，是否继续？')) return
+  setEditorDoc(legacyDraft.value)
+  saveDraft()
+  legacyDraft.value = null
 }
 function fmtTime(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '' }
 
@@ -530,8 +556,13 @@ function mountEditor() {
   if (!cmHost.value || editorView) return
   editorView = new EditorView({
     parent: cmHost.value,
-    state: EditorState.create({
-      doc: code.value,
+    state: createEditorState(code.value)
+  })
+}
+
+function createEditorState(doc) {
+  return EditorState.create({
+      doc,
       extensions: [
         lineNumbers(),
         highlightActiveLineGutter(),
@@ -547,28 +578,40 @@ function mountEditor() {
         EditorView.updateListener.of(update => {
           if (update.docChanged) {
             code.value = update.state.doc.toString()
-            if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
+            if (!replacingDocument) saveDraft()
           }
         })
       ]
-    })
   })
 }
 
-function setEditorDoc(text) {
+function setEditorDoc(text, fresh = false) {
+  code.value = text
   if (!editorView) return
-  editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: text } })
+  // 切题和切语言时重建撤销历史，防止撤销把另一份草稿写入当前题目。
+  if (fresh) {
+    editorView.setState(createEditorState(text))
+    return
+  }
+  replacingDocument = true
+  try {
+    editorView.dispatch({ changes: { from: 0, to: editorView.state.doc.length, insert: text } })
+  } finally {
+    replacingDocument = false
+  }
 }
 
 watch(language, (value, old) => {
   editorView?.dispatch({ effects: langCompartment.reconfigure(langExtension(value)) })
-  if (!old || !editorView || !selected.value) return
-  setEditorDoc(loadCodeFor(selected.value.problemId, value))
-})
+  if (!old || !editorView || !selected.value || problemLoading.value) return
+  setEditorDoc(loadCodeFor(selected.value.problemId, value), true)
+}, { flush: 'sync' })
 
 async function loadProblems() {
   loading.value = true
+  loadError.value = ''
   try {
+    await ensureUserId()
     if (isAssignment.value) {
       const list = await api(`/student/targets/${props.targetId}/problems`)
       const allSubs = await api(`/student/submissions?assignmentTargetId=${props.targetId}`)
@@ -600,39 +643,50 @@ async function loadProblems() {
       if (problems.value.length) await selectProblem(problems.value[0].problemId)
     } else {
       problems.value = await api('/student/practice/problems')
-      if (!selectedId.value && problems.value.length) await selectProblem(problems.value[0].problemId)
+      if (problems.value.length) await selectProblem(selectedId.value || problems.value[0].problemId)
     }
+  } catch (error) {
+    loadError.value = error.message || '题目加载失败，请重试'
   } finally {
     loading.value = false
   }
 }
 
 async function selectProblem(problemId) {
+  const version = ++selectionVersion
+  problemLoading.value = true
+  loadError.value = ''
   selectedId.value = problemId
+  selected.value = null
   resultPhase.value = 'idle'
   latestResult.value = { status: null, score: null, timeMs: null }
   selfTestResult.value = null
   caseDetails.value = []
+  submissions.value = []
   clearPoll()
-  if (isAssignment.value) {
-    selected.value = problems.value.find(problem => problem.problemId === problemId) || null
-  } else {
-    selected.value = await api(`/student/practice/problems/${problemId}`)
+  try {
+    const problem = isAssignment.value
+      ? problems.value.find(problem => problem.problemId === problemId) || null
+      : await api(`/student/practice/problems/${problemId}`)
+    // 快速切题时，较慢的旧请求不能覆盖当前题目或其草稿。
+    if (version !== selectionVersion) return
+    selected.value = problem
+    if (!selected.value) return
+    language.value = selected.value.languages?.[0] || 'CPP'
+    const firstSample = selected.value.samples?.[0]
+    selfTestInput.value = firstSample?.input || ''
+    setEditorDoc(loadCodeFor(problemId, language.value), true)
+    if (!editorView) {
+      await nextTick()
+      if (version !== selectionVersion) return
+      mountEditor()
+    }
+    await refreshSubmissionStatus()
+  } catch (error) {
+    if (version === selectionVersion) loadError.value = error.message || '题目加载失败，请重试'
+  } finally {
+    if (version === selectionVersion) problemLoading.value = false
   }
-  if (!selected.value) return
-  language.value = selected.value.languages?.[0] || 'CPP'
-  const firstSample = selected.value.samples?.[0]
-  selfTestInput.value = firstSample?.input || ''
-  code.value = loadCodeFor(problemId, language.value)
-  if (editorView) {
-    setEditorDoc(code.value)
-  } else {
-    await nextTick()
-    mountEditor()
-    setEditorDoc(code.value)
-  }
-  await refreshSubmissionStatus()
-  loadSubmissions()
 }
 
 async function loadSubmissions() {
@@ -690,25 +744,24 @@ async function loadCaseDetails(submissionId) {
 }
 
 function insertTemplate(templateCode) {
+  if (!selected.value || problemLoading.value) return
+  if (code.value && !window.confirm('使用模板将替换当前代码，是否继续？')) return
   code.value = templateCode
   setEditorDoc(templateCode)
-  if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), templateCode)
+  saveDraft()
   flashTip('模板已插入编辑器')
 }
 
 async function ensureUserId() {
   if (myUserId.value) return
-  try {
-    const profile = await api('/identity/me')
-    myUserId.value = profile.appUserId ?? 0
-  } catch {
-    myUserId.value = 0
-  }
+  const profile = await api('/identity/me')
+  if (!profile.appUserId) throw new Error('无法确认登录账号，请重新登录后重试')
+  myUserId.value = profile.appUserId
 }
 
 async function submit() {
   if (!selected.value || !code.value.trim() || !canSubmitNow.value) return
-  localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
+  saveDraft()
   submitting.value = true
   try {
     await api('/student/submissions', {
@@ -772,10 +825,12 @@ function fmtMem(kb) {
 }
 
 function resetCode() {
+  if (!selected.value || problemLoading.value) return
+  if (!window.confirm('重置将覆盖本题当前语言的草稿，是否继续？')) return
   const template = CODE_TEMPLATES[language.value] || ''
   code.value = template
   setEditorDoc(template)
-  if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), template)
+  saveDraft()
 }
 
 function openPanel(key) {
@@ -795,12 +850,6 @@ function step(delta) {
   const next = problems.value[currentIndex.value + delta]
   if (next) selectProblem(next.problemId)
 }
-
-watch(code, value => {
-  if (selected.value && value && editorView && editorView.state.doc.toString() !== value) {
-    setEditorDoc(value)
-  }
-})
 
 function startDrag(event) {
   event.preventDefault()
@@ -825,8 +874,7 @@ function onKeydown(event) {
   }
   if (mod && event.key.toLowerCase() === 's') {
     event.preventDefault()
-    if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
-    flashTip('草稿已保存')
+    if (!problemLoading.value && saveDraft()) flashTip('草稿已保存到本机')
   }
   if (mod && event.altKey && event.key.toLowerCase() === 'r') {
     event.preventDefault()
@@ -855,6 +903,7 @@ onMounted(() => {
   window.addEventListener('keydown', onKeydown)
 })
 onBeforeUnmount(() => {
+  selectionVersion++
   clearPoll()
   window.removeEventListener('keydown', onKeydown)
   editorView?.destroy()
@@ -864,6 +913,7 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .oj-workbench { flex: 1; display: flex; flex-direction: column; min-height: 0; height: 100%; }
+.workbench-error { padding: 8px 16px; color: var(--danger); background: var(--panel); }
 
 .assign-meta {
   display: flex;
