@@ -75,7 +75,7 @@ func (j *Judge) JudgeTask(ctx context.Context, task *Task) (*CaseResultSubmissio
 			return nil, fmt.Errorf("编译沙箱执行失败: %w", err)
 		}
 		if compileRes.ExitCode != 0 || compileRes.TimedOut || compileRes.OOMKilled {
-			return j.ceResult(compileRes), nil
+			return j.ceResult(task, compileRes), nil
 		}
 		if compileRes.ForbiddenSys {
 			return nil, fmt.Errorf("编译阶段触发受限系统调用（基础设施异常）")
@@ -84,6 +84,9 @@ func (j *Judge) JudgeTask(ctx context.Context, task *Task) (*CaseResultSubmissio
 			return nil, fmt.Errorf("编译产物缺失（写层回收为空）")
 		}
 		productFiles = compileRes.Files
+	} else {
+		// 解释型语言没有编译产物，需要直接向每个运行沙箱注入源码。
+		productFiles[lang.Run.Source] = []byte(task.Code)
 	}
 
 	// 运行阶段：每个测试点独立执行（当前用例最小可见）
@@ -113,6 +116,7 @@ func (j *Judge) JudgeTask(ctx context.Context, task *Task) (*CaseResultSubmissio
 			Workdir: "/workspace",
 		}, runLimits(lang.Run, snap))
 		if err != nil {
+			testcase.Wipe()
 			return nil, fmt.Errorf("运行沙箱执行失败（测试点 %d）: %w", order, err)
 		}
 		status := judgekit.MapRunResult(judgekit.RunOutcome{
@@ -201,9 +205,10 @@ func runLimits(s *judgekit.Stage, snap snapshotLimits) sandbox.Limits {
 	}
 }
 
-func (j *Judge) ceResult(res *sandbox.ExecResult) *CaseResultSubmission {
+func (j *Judge) ceResult(task *Task, res *sandbox.ExecResult) *CaseResultSubmission {
 	return &CaseResultSubmission{
 		ResultCode:      "CE",
+		ResultVersion:   task.Attempt,
 		NormalizedScore: "0.00",
 		TotalTimeMs:     res.WallTimeMs,
 		PeakMemoryKb:    res.PeakMemoryKb,
@@ -220,6 +225,7 @@ func (j *Judge) seResult(task *Task) *CaseResultSubmission {
 	}
 	return &CaseResultSubmission{
 		ResultCode:      "SE",
+		ResultVersion:   task.Attempt,
 		NormalizedScore: "0.00",
 		SandboxMode:     j.sandboxMode,
 		FallbackNotice:  j.fallbackNotice,
@@ -275,6 +281,9 @@ func (j *Judge) RunOnce(ctx context.Context, task *RunTask) *RunResult {
 		}
 	}
 
+	if lang.Compile == nil {
+		productFiles[lang.Run.Source] = []byte(task.Code)
+	}
 	files := map[string][]byte{}
 	for name, content := range productFiles {
 		files[name] = content
