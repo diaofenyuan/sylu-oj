@@ -409,7 +409,7 @@ onUnmounted(() => {
 .contest-mode {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 /* 比赛头部 */
@@ -417,7 +417,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 24px;
+  padding: var(--space-6);
   background: linear-gradient(135deg, var(--panel), var(--panel-2));
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -432,17 +432,17 @@ onUnmounted(() => {
 .contest-desc {
   margin: 0;
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .contest-status {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 20px;
+  gap: var(--space-2);
+  padding: var(--space-3) 20px;
   border-radius: 999px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .status-pending {
@@ -451,7 +451,7 @@ onUnmounted(() => {
 }
 
 .status-running {
-  background: linear-gradient(135deg, #10b981, #059669);
+  background: linear-gradient(135deg, var(--chart-ok), color-mix(in srgb, var(--chart-ok) 80%, #000));
   color: #fff;
   animation: pulse 2s infinite;
 }
@@ -472,7 +472,7 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 24px;
+  padding: var(--space-5) 24px;
   background: var(--panel);
   border: 2px solid var(--accent);
   border-radius: var(--radius);
@@ -481,25 +481,25 @@ onUnmounted(() => {
 .timer-section {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .timer-section > svg {
-  font-size: 32px;
+  font-size: var(--fs-4xl);
   color: var(--accent);
 }
 
 .timer-label {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .timer-display {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 32px;
+  gap: var(--space-2);
+  font-size: var(--fs-4xl);
   font-weight: 700;
   color: var(--text);
   font-variant-numeric: tabular-nums;
@@ -512,7 +512,7 @@ onUnmounted(() => {
 }
 
 .time-unit small {
-  font-size: 14px;
+  font-size: var(--fs-base);
   font-weight: 400;
   color: var(--muted);
 }
@@ -525,7 +525,7 @@ onUnmounted(() => {
 .freeze-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 10px 16px;
   background: var(--accent-soft);
   border: 1px solid var(--accent);
@@ -538,32 +538,32 @@ onUnmounted(() => {
 .contest-rules {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .rule-item {
   display: flex;
-  gap: 12px;
-  padding: 20px;
+  gap: var(--space-3);
+  padding: var(--space-5);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
 }
 
 .rule-item > svg {
-  font-size: 32px;
+  font-size: var(--fs-4xl);
   color: var(--accent);
 }
 
 .rule-item strong {
   display: block;
-  margin-bottom: 4px;
+  margin-bottom: var(--space-1);
   color: var(--text);
 }
 
 .rule-item p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -573,23 +573,23 @@ onUnmounted(() => {
 .contest-stats h3 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 0 16px;
 }
 
 .problems-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .problem-card {
-  padding: 20px;
+  padding: var(--space-5);
   background: var(--panel);
   border: 2px solid var(--border);
   border-radius: var(--radius);
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all var(--dur-base) var(--ease-out);
 }
 
 .problem-card:hover {
@@ -604,14 +604,14 @@ onUnmounted(() => {
 }
 
 .problem-card.first-blood {
-  border-color: #ef4444;
+  border-color: var(--chart-danger);
 }
 
 .problem-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  margin-bottom: var(--space-3);
 }
 
 .problem-label {
@@ -622,50 +622,52 @@ onUnmounted(() => {
   border-radius: 50%;
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: var(--fs-2xl);
   font-weight: 700;
 }
 
 .solved-badge {
-  font-size: 24px;
+  font-size: var(--fs-3xl);
   color: var(--ok);
 }
 
 .problem-body h4 {
   margin: 0 0 12px;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--text);
 }
 
 .problem-stats {
   display: flex;
-  gap: 12px;
-  font-size: 13px;
+  gap: var(--space-3);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .problem-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
 
-.first-blood {
+/* 作用域限定在卡片页脚内：避免与卡片自身的 first-blood 状态类同名冲突，
+   否则卡片会被一并置为 display:flex 导致内容横向挤压重叠 */
+.problem-footer .first-blood {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: #ef4444;
+  gap: var(--space-1);
+  color: var(--chart-danger);
   font-weight: 600;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .score {
@@ -684,7 +686,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: var(--space-2) 16px;
   background: var(--accent);
   color: #fff;
 }
@@ -701,16 +703,16 @@ onUnmounted(() => {
 }
 
 .leaderboard-table th {
-  padding: 12px 8px;
+  padding: var(--space-3) 8px;
   background: var(--panel-2);
   border-bottom: 2px solid var(--border);
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   text-align: center;
 }
 
 .leaderboard-table td {
-  padding: 12px 8px;
+  padding: var(--space-3) 8px;
   border-bottom: 1px solid var(--border);
   text-align: center;
 }
@@ -728,7 +730,7 @@ onUnmounted(() => {
 .rank-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 6px 12px;
   border-radius: 8px;
   font-weight: 700;
@@ -752,16 +754,16 @@ onUnmounted(() => {
 .team-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .team-school {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
 .solved-count {
-  font-size: 18px;
+  font-size: var(--fs-xl);
   color: var(--accent);
 }
 
@@ -775,9 +777,9 @@ onUnmounted(() => {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: 8px;
+  padding: var(--space-2);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .problem-cell.accepted {
@@ -812,11 +814,11 @@ onUnmounted(() => {
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .stat-card {
-  padding: 24px;
+  padding: var(--space-6);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -824,14 +826,14 @@ onUnmounted(() => {
 }
 
 .stat-value {
-  font-size: 32px;
+  font-size: var(--fs-4xl);
   font-weight: 700;
   color: var(--accent);
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -848,12 +850,12 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .contest-header {
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-4);
   }
   
   .contest-timer {
     flex-direction: column;
-    gap: 16px;
+    gap: var(--space-4);
   }
   
   .contest-rules,

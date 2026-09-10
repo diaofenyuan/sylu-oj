@@ -70,11 +70,32 @@
             <p class="pr-tip">提交后代码将进入隔离沙盒执行全部隐藏用例;自测运行不占提交次数。</p>
           </div>
         </template>
-        <div v-else class="pr-empty">{{ loading ? '题目加载中…' : '从右上角「题目列表」选择一道题' }}</div>
+        <div v-else-if="loading" class="pr-empty pr-loading" role="status" aria-busy="true">
+          <span class="spinner spinner-lg" aria-hidden="true"></span>
+          <p>题目加载中…</p>
+          <div class="pr-skeleton">
+            <div class="skeleton skeleton-line" style="--skeleton-w: 55%"></div>
+            <div class="skeleton skeleton-line" style="--skeleton-w: 92%"></div>
+            <div class="skeleton skeleton-line" style="--skeleton-w: 78%"></div>
+            <div class="skeleton skeleton-block"></div>
+          </div>
+        </div>
+        <div v-else class="pr-empty">从右上角「题目列表」选择一道题</div>
       </section>
 
-      <!-- 可拖拽分隔条 -->
-      <div class="wb-splitter" @mousedown="startDrag"></div>
+      <!-- 可拖拽分隔条：同时支持键盘调整，避免仅鼠标可操作 -->
+      <div
+        class="wb-splitter"
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="调整题面宽度"
+        :aria-valuemin="LEFT_WIDTH_MIN"
+        :aria-valuemax="leftWidthMax"
+        :aria-valuenow="Math.round(leftWidth)"
+        tabindex="0"
+        @mousedown="startDrag"
+        @keydown="onSplitterKeydown"
+      ></div>
 
       <!-- 右栏:编辑器 + 结果面板 -->
       <section class="wb-right">
@@ -83,6 +104,10 @@
           <select v-model="language" aria-label="选择编程语言">
             <option v-for="item in selected?.languages || langs" :key="item" :value="item">{{ langName(item) }}</option>
           </select>
+          <span v-if="langLoading" class="lang-loading" role="status">
+            <span class="spinner" aria-hidden="true"></span>
+            加载高亮…
+          </span>
           <span class="mode-tag">ACM 模式 · stdin/stdout</span>
           <span class="spacer"></span>
           <button class="tb-btn" @click="showTemplates = true">
@@ -231,13 +256,14 @@
     </div>
 
     <!-- 题目列表抽屉 -->
-    <div v-if="drawer" class="drawer-mask" @click.self="drawer = false">
+    <AppOverlay :open="drawer" placement="drawer-left" aria-label="题目列表"
+                @close="drawer = false">
       <div class="drawer">
         <div class="drawer-head">
           <strong>题目列表</strong>
           <span class="spacer"></span>
           <span class="muted">{{ passedCount }}/{{ problems.length }} 已通过</span>
-          <button class="mini-btn" @click="drawer = false">✕</button>
+          <button type="button" class="mini-btn" aria-label="关闭题目列表" @click="drawer = false">✕</button>
         </div>
         <div v-if="isAssignment && meta" class="drawer-progress">
           <ProgressCard
@@ -283,7 +309,7 @@
           <div v-if="!filteredProblems.length" class="rp-idle">没有匹配的题目</div>
         </div>
       </div>
-    </div>
+    </AppOverlay>
 
     <TemplatePicker :visible="showTemplates" :language="language" @close="showTemplates = false" @insert="insertTemplate" />
     <ShortcutHelp :visible="showShortcuts" @close="showShortcuts = false" />
@@ -297,6 +323,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { api } from '../api'
 import { useJudgeStatus } from '../composables/useJudgeStatus'
+import { useToast } from '../composables/useToast'
 import CaseDetails from './CaseDetails.vue'
 import ErrorDiagnostics from './ErrorDiagnostics.vue'
 import SampleCompare from './SampleCompare.vue'
@@ -315,11 +342,10 @@ import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirro
 import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete'
 import { indentOnInput, bracketMatching, syntaxHighlighting, HighlightStyle } from '@codemirror/language'
 import { tags } from '@lezer/highlight'
-import { cpp } from '@codemirror/lang-cpp'
-import { python } from '@codemirror/lang-python'
-import { java } from '@codemirror/lang-java'
+// 三套语言语法包（@lezer/cpp 等）体积可观，改为按需加载，见 resolveLangExtension
 
 const { getStatusIcon, getStatusText, getStatusClass } = useJudgeStatus()
+const toast = useToast()
 
 const props = defineProps({
   mode: { type: String, default: 'practice' },
@@ -418,7 +444,66 @@ const latestResult = ref({ status: null, score: null, timeMs: null })
 const selfTestInput = ref('')
 const selfTestResult = ref(null)
 const submissions = ref([])
-const leftWidth = ref(480)
+
+/**
+ * 题面宽度
+ * -----------------------------------------------------------------------------
+ * 学生通常会按自己的读题习惯调整左右分栏，此前每次进入工作台都会重置回默认值。
+ * 这里把宽度持久化到 localStorage，并在读取时按当前视口重新约束，避免旧值在小屏上溢出。
+ */
+const LEFT_WIDTH_KEY = 'oj-wb-left-width'
+const LEFT_WIDTH_MIN = 320
+// 右侧编辑器区至少保留的宽度
+const LEFT_WIDTH_RESERVED = 420
+const LEFT_WIDTH_DEFAULT = 480
+// 仅用于计算 aria-valuemax，随窗口尺寸变化
+const viewportWidth = ref(typeof window !== 'undefined' ? window.innerWidth : 1440)
+
+const leftWidthMax = computed(() => Math.max(LEFT_WIDTH_MIN, viewportWidth.value - LEFT_WIDTH_RESERVED))
+
+function clampLeftWidth(value) {
+  return Math.min(Math.max(LEFT_WIDTH_MIN, value), leftWidthMax.value)
+}
+
+function loadLeftWidth() {
+  try {
+    const saved = Number(localStorage.getItem(LEFT_WIDTH_KEY))
+    if (Number.isFinite(saved) && saved > 0) return clampLeftWidth(saved)
+  } catch {
+    // 隐私模式下 localStorage 不可用，回退默认值
+  }
+  return LEFT_WIDTH_DEFAULT
+}
+
+const leftWidth = ref(loadLeftWidth())
+
+function persistLeftWidth() {
+  try {
+    localStorage.setItem(LEFT_WIDTH_KEY, String(Math.round(leftWidth.value)))
+  } catch {
+    // 写入失败不影响使用
+  }
+}
+
+/** 键盘调整：左右方向键移动 16px，Home/End 跳到两端 */
+function onSplitterKeydown(event) {
+  const step = 16
+  const actions = {
+    ArrowLeft: () => { leftWidth.value = clampLeftWidth(leftWidth.value - step) },
+    ArrowRight: () => { leftWidth.value = clampLeftWidth(leftWidth.value + step) },
+    Home: () => { leftWidth.value = LEFT_WIDTH_MIN },
+    End: () => { leftWidth.value = leftWidthMax.value }
+  }
+  const action = actions[event.key]
+  if (!action) return
+  event.preventDefault()
+  action()
+  persistLeftWidth()
+}
+
+function syncViewportWidth() {
+  viewportWidth.value = window.innerWidth
+}
 const showTemplates = ref(false)
 const showShortcuts = ref(false)
 const showLeaderboard = ref(false)
@@ -429,6 +514,58 @@ const cmHost = ref(null)
 let editorView = null
 const langCompartment = new Compartment()
 let pollTimer = null
+
+/**
+ * 语言语法包按需加载
+ * -----------------------------------------------------------------------------
+ * 三套 lezer 语法包（cpp / python / java）合计占工作台分块的绝大部分体积。
+ * 静态 import 会让只用一种语言的学生也下载其余两套，故改为按需动态加载：
+ *   - 编辑器先以纯文本挂载（保证工具栏与输入立刻可用），语言包就绪后再注入高亮；
+ *   - 加载结果按语言缓存，切换回来时不再重新下载；
+ *   - 加载失败降级为纯文本编辑，不阻断答题。
+ */
+const LANG_LOADERS = {
+  CPP: () => import('@codemirror/lang-cpp').then((m) => m.cpp()),
+  PYTHON: () => import('@codemirror/lang-python').then((m) => m.python()),
+  JAVA: () => import('@codemirror/lang-java').then((m) => m.java())
+}
+
+const langCache = new Map()
+const langLoading = ref(false)
+// 竞态令牌：快速连续切换语言时，只允许最后一次请求的结果落地
+let langRequestSeq = 0
+let langFallbackNotified = false
+
+async function resolveLangExtension(value) {
+  const key = LANG_LOADERS[value] ? value : 'CPP'
+  if (langCache.has(key)) return langCache.get(key)
+
+  langLoading.value = true
+  try {
+    const extension = await LANG_LOADERS[key]()
+    langCache.set(key, extension)
+    return extension
+  } catch (e) {
+    // 语言包加载失败不应让编辑器不可用：退回无高亮的纯文本编辑，答题与提交不受影响
+    console.error('[workbench] 语言语法包加载失败，已回退为纯文本编辑:', e)
+    if (!langFallbackNotified) {
+      langFallbackNotified = true
+      toast.error('代码高亮加载失败，已切换为纯文本编辑，不影响提交')
+    }
+    return null
+  } finally {
+    langLoading.value = false
+  }
+}
+
+/** 切换语言时异步应用高亮；首次挂载不走此路径（见 mountEditor） */
+async function applyLanguage(value) {
+  const seq = ++langRequestSeq
+  const extension = await resolveLangExtension(value)
+  // 已有更新的切换请求，丢弃本次结果，避免旧语言覆盖新语言
+  if (seq !== langRequestSeq || !editorView) return
+  editorView.dispatch({ effects: langCompartment.reconfigure(extension ?? []) })
+}
 
 const filteredProblems = computed(() => problems.value.filter(problem => {
   const matchesDifficulty = !difficulty.value || problem.difficulty === difficulty.value
@@ -520,39 +657,45 @@ function flashTip(text) {
   setTimeout(() => { if (tipText.value === text) tipText.value = '' }, 1800)
 }
 
-function langExtension(value) {
-  if (value === 'PYTHON') return python()
-  if (value === 'JAVA') return java()
-  return cpp()
-}
+let editorMounting = false
 
-function mountEditor() {
-  if (!cmHost.value || editorView) return
-  editorView = new EditorView({
-    parent: cmHost.value,
-    state: EditorState.create({
-      doc: code.value,
-      extensions: [
-        lineNumbers(),
-        highlightActiveLineGutter(),
-        highlightActiveLine(),
-        history(),
-        indentOnInput(),
-        bracketMatching(),
-        closeBrackets(),
-        keymap.of([...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap, indentWithTab]),
-        langCompartment.of(langExtension(language.value)),
-        drawSelection(),
-        ...vscodeTheme,
-        EditorView.updateListener.of(update => {
-          if (update.docChanged) {
-            code.value = update.state.doc.toString()
-            if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
-          }
-        })
-      ]
+async function mountEditor() {
+  // editorMounting 防止并发调用导致创建两个编辑器实例
+  if (!cmHost.value || editorView || editorMounting) return
+  editorMounting = true
+  try {
+    // 先取到语法包再挂载：避免"先无高亮、随后突然变色"的闪烁。
+    // 取包失败时 extension 为 null，退化为纯文本编辑而非报错。
+    const extension = await resolveLangExtension(language.value)
+    if (!cmHost.value || editorView) return
+    editorView = new EditorView({
+      parent: cmHost.value,
+      state: EditorState.create({
+        doc: code.value,
+        extensions: [
+          lineNumbers(),
+          highlightActiveLineGutter(),
+          highlightActiveLine(),
+          history(),
+          indentOnInput(),
+          bracketMatching(),
+          closeBrackets(),
+          keymap.of([...defaultKeymap, ...historyKeymap, ...closeBracketsKeymap, indentWithTab]),
+          langCompartment.of(extension ?? []),
+          drawSelection(),
+          ...vscodeTheme,
+          EditorView.updateListener.of(update => {
+            if (update.docChanged) {
+              code.value = update.state.doc.toString()
+              if (selected.value) localStorage.setItem(draftKey(selected.value.problemId, language.value), code.value)
+            }
+          })
+        ]
+      })
     })
-  })
+  } finally {
+    editorMounting = false
+  }
 }
 
 function setEditorDoc(text) {
@@ -561,7 +704,7 @@ function setEditorDoc(text) {
 }
 
 watch(language, (value, old) => {
-  editorView?.dispatch({ effects: langCompartment.reconfigure(langExtension(value)) })
+  applyLanguage(value)
   if (!old || !editorView || !selected.value) return
   setEditorDoc(loadCodeFor(selected.value.problemId, value))
 })
@@ -628,7 +771,7 @@ async function selectProblem(problemId) {
     setEditorDoc(code.value)
   } else {
     await nextTick()
-    mountEditor()
+    await mountEditor()
     setEditorDoc(code.value)
   }
   await refreshSubmissionStatus()
@@ -807,11 +950,13 @@ function startDrag(event) {
   const startX = event.clientX
   const startWidth = leftWidth.value
   const onMove = e => {
-    leftWidth.value = Math.min(Math.max(320, startWidth + e.clientX - startX), window.innerWidth - 420)
+    leftWidth.value = clampLeftWidth(startWidth + e.clientX - startX)
   }
   const onUp = () => {
     window.removeEventListener('mousemove', onMove)
     window.removeEventListener('mouseup', onUp)
+    // 拖拽结束后再落盘，避免每帧写入 localStorage
+    persistLeftWidth()
   }
   window.addEventListener('mousemove', onMove)
   window.addEventListener('mouseup', onUp)
@@ -819,6 +964,17 @@ function startDrag(event) {
 
 function onKeydown(event) {
   const mod = event.ctrlKey || event.metaKey
+  // 快捷键帮助自身需可由同一组合键关闭，故先单独处理；
+  // 注意不能把它放在下面的"让位"判断之后，否则面板打开后就再也关不掉。
+  if (mod && event.key === '/') {
+    if (drawer.value || showTemplates.value || showLeaderboard.value) return
+    event.preventDefault()
+    showShortcuts.value = !showShortcuts.value
+    return
+  }
+  // 其余弹层打开时全局快捷键全部让位，避免在弹层内误触发提交/跳题等动作
+  if (drawer.value || showTemplates.value || showShortcuts.value || showLeaderboard.value) return
+
   if (mod && event.key === 'Enter') {
     event.preventDefault()
     submit()
@@ -836,10 +992,6 @@ function onKeydown(event) {
     event.preventDefault()
     showTemplates.value = true
   }
-  if (mod && event.key === '/') {
-    event.preventDefault()
-    showShortcuts.value = !showShortcuts.value
-  }
   if (mod && !event.altKey && event.key === '[') {
     event.preventDefault()
     step(-1)
@@ -853,10 +1005,12 @@ function onKeydown(event) {
 onMounted(() => {
   loadProblems()
   window.addEventListener('keydown', onKeydown)
+  window.addEventListener('resize', syncViewportWidth)
 })
 onBeforeUnmount(() => {
   clearPoll()
   window.removeEventListener('keydown', onKeydown)
+  window.removeEventListener('resize', syncViewportWidth)
   editorView?.destroy()
   editorView = null
 })
@@ -868,7 +1022,7 @@ onBeforeUnmount(() => {
 .assign-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 9px 20px;
   border-bottom: 1px solid var(--border);
   background: var(--panel-2);
@@ -884,20 +1038,20 @@ onBeforeUnmount(() => {
   background: var(--panel);
 }
 .tb-btn {
-  background: #fff;
+  background: var(--panel);
   color: var(--text);
   border: 1px solid var(--border-strong);
   box-shadow: none;
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 .tb-btn:hover:not(:disabled) { background: var(--panel-2); box-shadow: none; }
 .tb-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .tb-title strong { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tb-nav { display: flex; gap: 6px; margin-left: auto; }
-.tb-progress { display: flex; align-items: baseline; gap: 2px; color: var(--muted); font-size: 13px; }
+.tb-progress { display: flex; align-items: baseline; gap: 2px; color: var(--muted); font-size: var(--fs-sm); }
 .tb-progress strong { color: var(--accent); font-size: 19px; }
-.tb-progress small { margin-left: 4px; font-size: 12px; }
+.tb-progress small { margin-left: var(--space-1); font-size: var(--fs-xs); }
 
 .wb-body { flex: 1; display: flex; min-height: 0; }
 
@@ -910,66 +1064,106 @@ onBeforeUnmount(() => {
   background: var(--panel);
   min-height: 0;
 }
-.pr-head { padding: 16px 20px 12px; border-bottom: 1px solid var(--border); }
+.pr-head { padding: var(--space-4) 20px 12px; border-bottom: 1px solid var(--border); }
 .pr-head h3 { margin: 0 0 8px; font-size: 19px; }
 .pr-meta { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 .meta-item { color: var(--muted); font-size: 12.5px; }
-.pr-scroll { flex: 1; overflow-y: auto; padding: 16px 20px 24px; min-height: 0; }
-.pr-desc { white-space: pre-wrap; line-height: 1.85; font-size: 14px; }
-.pr-samples { margin-top: 18px; display: flex; flex-direction: column; gap: 12px; }
+.pr-scroll { flex: 1; overflow-y: auto; padding: var(--space-4) 20px 24px; min-height: 0; }
+.pr-desc { white-space: pre-wrap; line-height: 1.85; font-size: var(--fs-base); }
+.pr-samples { margin-top: 18px; display: flex; flex-direction: column; gap: var(--space-3); }
 .sample-box { border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); padding: 11px 13px; }
-.sample-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; }
+.sample-head { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); font-size: var(--fs-sm); }
 .sample-head .spacer { flex: 1; }
 .mini-btn {
-  background: #fff;
+  background: var(--panel);
   color: var(--muted);
   border: 1px solid var(--border);
   box-shadow: none;
   padding: 3px 9px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
-.mini-btn:hover:not(:disabled) { color: var(--accent); border-color: #c7d9ff; box-shadow: none; }
-.sample-io { display: grid; grid-template-columns: 34px 1fr; gap: 8px; margin-top: 6px; }
+.mini-btn:hover:not(:disabled) { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 34%, transparent); box-shadow: none; }
+.sample-io { display: grid; grid-template-columns: 34px 1fr; gap: var(--space-2); margin-top: 6px; }
 .sample-io span { font-size: 11.5px; color: var(--muted); padding-top: 2px; }
 .sample-io pre { margin: 0; font: 12.5px/1.55 Consolas, monospace; white-space: pre-wrap; word-break: break-all; }
-.pr-tip { margin-top: 20px; font-size: 12.5px; color: var(--muted); }
+.pr-tip { margin-top: var(--space-5); font-size: 12.5px; color: var(--muted); }
 .closed-tip { color: var(--danger); font-weight: 600; }
 .pr-empty { flex: 1; display: grid; place-items: center; color: var(--muted); padding: 30px; }
+
+/* 题面加载骨架：与最终排版保持相近的视觉密度，减少加载完成后的跳动 */
+.pr-loading {
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
+  color: var(--accent);
+  animation: m-fade-in var(--dur-base) var(--ease-out) both;
+}
+.pr-loading p { margin: 0; color: var(--muted); font-size: var(--fs-sm); }
+.pr-skeleton {
+  width: min(460px, 88%);
+  margin-top: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.pr-skeleton .skeleton-line { margin-bottom: 0; height: 13px; }
+.skeleton-block { height: 96px; border-radius: 10px; }
 
 .wb-splitter {
   flex: none;
   width: 5px;
   cursor: col-resize;
   background: var(--border);
-  transition: background 0.15s ease;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 .wb-splitter:hover { background: var(--accent); }
+.wb-splitter:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  background: var(--accent);
+}
 
-.wb-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: #1e1e1e; }
+.wb-right { flex: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--editor-bg); }
 .code-toolbar {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
-  background: #1f1f1f;
-  border-bottom: 1px solid #333333;
+  padding: var(--space-2) 12px;
+  background: var(--editor-bar);
+  border-bottom: 1px solid var(--editor-border);
 }
-.code-toolbar select { background: #3c3c3c; color: #cccccc; border: 1px solid #454545; padding: 5px 10px; font-size: 13px; }
-.code-toolbar select:hover { border-color: #5a5a5a; }
-.mode-tag { color: #8a8a8a; font-size: 12px; }
-.code-toolbar .tb-btn { background: #3c3c3c; color: #cccccc; border: 1px solid transparent; }
-.code-toolbar .tb-btn:hover:not(:disabled) { background: #4a4a4a; color: #fff; border-color: transparent; }
+.code-toolbar select { background: var(--editor-control); color: var(--editor-text); border: 1px solid var(--editor-control-border); padding: 5px 10px; font-size: var(--fs-sm); }
+.code-toolbar select:hover { border-color: var(--editor-control-hover); }
+.mode-tag { color: var(--editor-text-muted); font-size: var(--fs-xs); }
+
+/* 语言语法包按需加载时的提示：编辑器仍可输入，仅高亮尚未生效 */
+.lang-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
+  color: var(--editor-text-muted);
+  animation: m-fade-in var(--dur-base) var(--ease-out) both;
+}
+.lang-loading .spinner {
+  width: 12px;
+  height: 12px;
+  border-width: 2px;
+  color: var(--editor-text-muted);
+}
+.code-toolbar .tb-btn { background: var(--editor-control); color: var(--editor-text); border: 1px solid transparent; }
+.code-toolbar .tb-btn:hover:not(:disabled) { background: var(--editor-control-active); color: var(--editor-text-strong); border-color: transparent; }
 .code-toolbar .spacer { flex: 1; }
 .file-tab {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  background: #2d2d2d;
-  color: #e8e8e8;
-  border: 1px solid #3f3f3f;
+  background: var(--editor-tab);
+  color: var(--editor-text-strong);
+  border: 1px solid var(--editor-tab-border);
   border-radius: 6px;
-  padding: 4px 12px;
-  font-size: 13px;
+  padding: var(--space-1) 12px;
+  font-size: var(--fs-sm);
   font-family: 'Segoe UI', system-ui, sans-serif;
 }
 .file-tab::before {
@@ -984,14 +1178,14 @@ onBeforeUnmount(() => {
 .cm-wrap { flex: 1; min-height: 0; }
 .cm-host { height: 100%; }
 .cm-host :deep(.cm-editor) { height: 100%; }
-.cm-host :deep(.cm-gutters) { border-right: 1px solid #333333; }
+.cm-host :deep(.cm-gutters) { border-right: 1px solid var(--editor-border); }
 
-.result-panel { flex: none; border-top: 1px solid #334155; background: #fff; display: flex; flex-direction: column; height: 250px; }
+.result-panel { flex: none; border-top: 1px solid var(--border); background: var(--panel); display: flex; flex-direction: column; height: 250px; }
 .result-panel.collapsed { height: auto; }
 .rp-tabs {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 6px 12px;
   border-bottom: 1px solid var(--border);
   flex: none;
@@ -1007,48 +1201,41 @@ onBeforeUnmount(() => {
 }
 .rp-tab:hover:not(:disabled) { background: var(--panel-2); box-shadow: none; }
 .rp-tab.active { color: var(--accent); background: var(--accent-soft); font-weight: 700; }
-.rp-badge { font-style: normal; font-size: 11px; background: #e2e8f0; border-radius: 999px; padding: 0 6px; margin-left: 4px; }
-.run-btn { background: #16a34a; }
-.run-btn:hover:not(:disabled) { background: #15803d; }
+.rp-badge { font-style: normal; font-size: var(--fs-2xs); background: var(--panel-2); border-radius: 999px; padding: 0 6px; margin-left: var(--space-1); }
+.run-btn { background: var(--ok); }
+.run-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--ok) 82%, #000); }
 .submit-btn { background: var(--accent); }
 .submit-btn:hover:not(:disabled) { background: var(--accent-strong); }
 .result-panel .rp-tabs .mini-btn { border-color: var(--border-strong); }
 
-.rp-body { flex: 1; overflow-y: auto; padding: 12px 16px; min-height: 0; }
+.rp-body { flex: 1; overflow-y: auto; padding: var(--space-3) 16px; min-height: 0; }
 .rp-idle { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 13.5px; }
-.rp-pending { display: flex; align-items: center; gap: 10px; height: 100%; justify-content: center; color: var(--accent); font-size: 14px; }
+.rp-pending { display: flex; align-items: center; gap: 10px; height: 100%; justify-content: center; color: var(--accent); font-size: var(--fs-base); }
 .spin {
   width: 15px;
   height: 15px;
-  border: 2px solid #c7d9ff;
+  border: 2px solid color-mix(in srgb, var(--accent) 34%, transparent);
   border-top-color: var(--accent);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
-.result-line { display: flex; align-items: center; gap: 16px; font-size: 14px; }
+.result-line { display: flex; align-items: center; gap: var(--space-4); font-size: var(--fs-base); }
 .result-score strong { color: var(--ok); font-size: 17px; margin: 0 2px; }
-.result-hint { margin-top: 8px; font-size: 12.5px; }
+.result-hint { margin-top: var(--space-2); font-size: 12.5px; }
 
 .selftest-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.st-label { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+.st-label { font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; display: flex; align-items: center; gap: var(--space-2); }
 .st-area { width: 100%; resize: vertical; font-size: 12.5px; }
 .st-out { margin: 0; background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px; padding: 9px 11px; min-height: 92px; max-height: 180px; overflow: auto; white-space: pre-wrap; word-break: break-all; }
-.st-out.bad { border-color: #fecaca; background: var(--danger-soft); }
+.st-out.bad { border-color: color-mix(in srgb, var(--danger) 32%, transparent); background: var(--danger-soft); }
 .st-out.dim { color: var(--muted); }
 .st-err { margin: 10px 0 0; color: var(--danger); font-size: 12.5px; white-space: pre-wrap; }
 
-.sub-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 0; box-shadow: none; border: none; }
+.sub-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); margin: 0; box-shadow: none; border: none; }
 .sub-table th, .sub-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: left; }
-.sub-table th { background: var(--panel-2); font-size: 12px; }
+.sub-table th { background: var(--panel-2); font-size: var(--fs-xs); }
 
-.drawer-mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 23, 42, 0.45);
-  z-index: 90;
-  display: flex;
-}
 .drawer {
   width: min(430px, 92vw);
   background: var(--panel);
@@ -1056,26 +1243,24 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
-  animation: slide-in 0.18s ease;
 }
-@keyframes slide-in { from { transform: translateX(-30px); opacity: 0; } }
 .drawer-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
-.drawer-progress { padding: 12px 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
+.drawer-progress { padding: var(--space-3) 16px; border-bottom: 1px solid var(--border); background: var(--panel-2); }
 .drawer-progress :deep(.progress-card) { box-shadow: none; border: none; background: transparent; padding: 0; }
-.level-strip { display: flex; gap: 6px; padding: 12px 16px 0; flex-wrap: wrap; }
-.level-tab { border: 1px solid var(--border); background: #fff; color: var(--muted); box-shadow: none; padding: 7px 11px; font-size: 12.5px; border-radius: 9px; }
+.level-strip { display: flex; gap: 6px; padding: var(--space-3) 16px 0; flex-wrap: wrap; }
+.level-tab { border: 1px solid var(--border); background: var(--panel); color: var(--muted); box-shadow: none; padding: 7px 11px; font-size: 12.5px; border-radius: 9px; }
 .level-tab:hover { box-shadow: none; background: var(--panel-2); }
-.level-tab.active { background: var(--accent-soft); border-color: #bfd4ff; color: var(--accent-strong); }
+.level-tab.active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 34%, transparent); color: var(--accent-strong); }
 .level-tab small { margin-left: 5px; opacity: 0.75; }
-.list-toolbar { display: flex; gap: 8px; padding: 12px 16px; }
-.list-toolbar input { flex: 1; min-width: 0; padding: 8px 10px; }
-.list-toolbar select { width: 104px; padding: 8px 7px; font-size: 12px; }
+.list-toolbar { display: flex; gap: var(--space-2); padding: var(--space-3) 16px; }
+.list-toolbar input { flex: 1; min-width: 0; padding: var(--space-2) 10px; }
+.list-toolbar select { width: 104px; padding: var(--space-2) 7px; font-size: var(--fs-xs); }
 .drawer-list { flex: 1; overflow-y: auto; border-top: 1px solid var(--border); }
 .problem-row {
   width: 100%;
   display: grid;
   grid-template-columns: 88px minmax(0, 1fr) auto;
-  gap: 8px;
+  gap: var(--space-2);
   text-align: left;
   justify-content: initial;
   background: transparent;
@@ -1084,15 +1269,15 @@ onBeforeUnmount(() => {
   border-bottom: 1px solid var(--border);
   border-radius: 0;
   box-shadow: none;
-  padding: 12px 16px;
+  padding: var(--space-3) 16px;
   font-weight: 500;
   font-size: 13.5px;
 }
 .problem-row:hover { background: var(--panel-2); box-shadow: none; }
 .problem-row.selected { background: var(--accent-soft); box-shadow: inset 3px 0 var(--accent); }
-.problem-no { color: var(--muted); font-size: 11px; }
+.problem-no { color: var(--muted); font-size: var(--fs-2xs); }
 .problem-title { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.problem-state { font-size: 11px; }
+.problem-state { font-size: var(--fs-2xs); }
 
 .copy-tip {
   position: fixed;
@@ -1101,9 +1286,9 @@ onBeforeUnmount(() => {
   transform: translateX(-50%);
   background: #0f172a;
   color: #fff;
-  padding: 8px 16px;
+  padding: var(--space-2) 16px;
   border-radius: 9px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   z-index: 120;
 }
 
@@ -1114,5 +1299,21 @@ onBeforeUnmount(() => {
   .wb-right { min-height: 520px; }
   .selftest-grid { grid-template-columns: 1fr; }
   .tb-title strong { max-width: 32vw; }
+}
+
+@media (max-width: 640px) {
+  /* 工具条改为多行排布，按钮保持内容宽度，避免小屏下被拉伸成竖排文字 */
+  .wb-topbar { flex-wrap: wrap; row-gap: var(--space-2); padding: var(--space-2) 12px; }
+  .wb-topbar button,
+  .code-toolbar button,
+  .rp-tabs button { width: auto; flex: none; }
+  .tb-nav { margin-left: 0; }
+  .tb-progress { margin-left: auto; }
+  .tb-title { flex: 1 1 100%; order: 3; }
+  .tb-title strong { max-width: none; white-space: normal; }
+  .wb-left { max-height: 46vh; }
+  .wb-right { min-height: 380px; }
+  .result-panel { height: auto; max-height: 44vh; }
+  .code-toolbar { flex-wrap: wrap; row-gap: 6px; }
 }
 </style>

@@ -8,7 +8,7 @@
       <span class="perf-summary">
         <Icon icon="mdi:timer" />
         最慢: {{ maxTime }}ms
-        <Icon icon="mdi:memory" style="margin-left: 12px" />
+        <Icon icon="mdi:memory" style="margin-left: var(--space-3)" />
         峰值: {{ maxMemory }}
       </span>
     </div>
@@ -125,7 +125,7 @@ function getCaseClass(status) {
 function getBarColor(status) {
   if (status === 'AC') return 'var(--ok)'
   if (status === 'TLE') return 'var(--warn)'
-  if (status === 'MLE') return '#9333ea'
+  if (status === 'MLE') return 'var(--chart-purple)'
   return 'var(--danger)'
 }
 </script>
@@ -135,18 +135,18 @@ function getBarColor(status) {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 10px;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   overflow: hidden;
 }
 
 .details-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
+  gap: var(--space-2);
+  padding: var(--space-3) 16px;
   cursor: pointer;
   user-select: none;
-  transition: background 0.15s ease;
+  transition: background var(--dur-fast) var(--ease-out);
 }
 
 .details-header:hover {
@@ -157,20 +157,20 @@ function getBarColor(status) {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 .details-body {
   border-top: 1px solid var(--border);
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .case-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-bottom: 24px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
 }
 
 .case-item {
@@ -181,7 +181,7 @@ function getBarColor(status) {
   background: var(--panel-2);
   border-radius: 8px;
   border-left: 3px solid transparent;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
 }
 
 .case-item:hover {
@@ -199,7 +199,7 @@ function getBarColor(status) {
 .case-left, .case-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .case-order {
@@ -216,19 +216,19 @@ function getBarColor(status) {
 .case-time, .case-memory {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 .perf-charts {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 24px;
+  gap: var(--space-6);
 }
 
 .chart-section h4 {
-  font-size: 14px;
+  font-size: var(--fs-base);
   margin: 0 0 12px;
   color: var(--text);
 }
@@ -242,7 +242,7 @@ function getBarColor(status) {
 .bar-item {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .bar-bg {
@@ -255,12 +255,12 @@ function getBarColor(status) {
 
 .bar-fill {
   height: 100%;
-  transition: width 0.3s ease;
+  transition: width var(--dur-base) var(--ease-out);
   border-radius: 4px;
 }
 
 .bar-label {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
   min-width: 60px;
   text-align: right;

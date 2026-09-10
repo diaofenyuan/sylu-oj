@@ -24,6 +24,9 @@ node_modules/
 dist/
 *.log
 
+# Vite 开发服务器运行期生成的临时配置副本
+vite.config.js.timestamp-*.mjs
+
 # 运行时本地数据与导出临时目录
 var/
 app/api/var/

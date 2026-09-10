@@ -246,8 +246,8 @@ const bscSuggestions = computed(() => [
   border: 1px solid #fca5a5;
   border-left: 4px solid var(--danger);
   border-radius: 10px;
-  padding: 16px;
-  margin-top: 12px;
+  padding: var(--space-4);
+  margin-top: var(--space-3);
 }
 
 .dark .error-diagnostics {
@@ -258,21 +258,21 @@ const bscSuggestions = computed(() => [
 .diagnostic-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  font-size: 15px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-md);
   color: var(--text);
 }
 
 .bulb-icon {
-  color: #f59e0b;
-  font-size: 20px;
+  color: var(--chart-warn);
+  font-size: var(--fs-2xl);
 }
 
 .diagnostic-body {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .error-type {
@@ -281,7 +281,7 @@ const bscSuggestions = computed(() => [
   gap: 6px;
   font-weight: 600;
   color: var(--danger);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .error-message {
@@ -290,7 +290,7 @@ const bscSuggestions = computed(() => [
   border-radius: 6px;
   padding: 10px;
   font-family: 'Cascadia Code', 'JetBrains Mono', Consolas, monospace;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text);
   white-space: pre-wrap;
   overflow-x: auto;
@@ -309,15 +309,15 @@ const bscSuggestions = computed(() => [
 .info-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
   color: var(--text);
 }
 
 .suggestions {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .suggestion-title {
@@ -326,19 +326,19 @@ const bscSuggestions = computed(() => [
   gap: 6px;
   font-weight: 600;
   color: var(--accent);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .suggestions ul {
   margin: 0;
-  padding-left: 20px;
+  padding-left: var(--space-5);
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
 
 .suggestions li {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   color: var(--text);
 }

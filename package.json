@@ -4,9 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:api": "playwright test tests/api"
+    "test:api": "playwright test tests/api",
+    "test:ui": "node scripts/ui-smoke.mjs",
+    "verify:frontend": "node scripts/verify-frontend.mjs",
+    "visual:snapshot": "node scripts/visual-diff.mjs --snapshot",
+    "visual:diff": "node scripts/visual-diff.mjs",
+    "check:tokens": "node scripts/check-design-tokens.mjs"
   },
   "devDependencies": {
-    "@playwright/test": "^1.47.2"
+    "@playwright/test": "^1.47.2",
+    "pixelmatch": "^7.2.0",
+    "pngjs": "^7.0.0"
   }
 }

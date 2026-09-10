@@ -1,12 +1,17 @@
 <template>
   <div>
-    <div class="page-head">
+    <div class="page-head" v-reveal>
       <h2>作业管理</h2>
       <p class="muted">管理已发布作业/考试：修改时间窗口、立即收卷、撤回与重新发布；考试（EXAM）发布后已锁定，
         修改须经双人审批放行</p>
     </div>
 
-    <div class="card" v-for="a in items" :key="a.id">
+    <SkeletonList v-if="loading" :count="2" />
+
+    <ErrorState v-else-if="error" :detail="error" :retrying="loading" @retry="load" />
+
+    <template v-else>
+    <div class="card" v-for="(a, i) in items" :key="a.id" v-reveal="{ delay: i * 70 }">
       <div class="row section-row">
         <h3>#{{ a.id }} {{ a.title }}</h3>
         <span class="chip" :class="a.mode === 'EXAM' ? 'chip-warn' : 'chip-primary'">
@@ -68,27 +73,33 @@
       </div>
     </div>
 
-    <div v-if="!loading && !items.length" class="empty">暂无作业，请到「组卷发布」创建</div>
-    <div v-if="msg" class="ok-banner">{{ msg }}</div>
-    <div v-if="errMsg" class="err-banner">
-      {{ errMsg }}
-      <template v-if="pendingApproval">
+    <EmptyState
+      v-if="!items.length"
+      icon="mdi:clipboard-list-outline"
+      title="暂无作业"
+      description="请到「组卷发布」创建作业或考试" />
+    </template>
+
+    <!-- 考试锁定是"需要下一步动作"的状态，保留内联提示而非一次性消息 -->
+    <Transition name="alert">
+      <div v-if="pendingApproval" class="lock-notice">
+        <Icon icon="mdi:shield-alert" aria-hidden="true" />
+        <span>该考试已锁定，修改须经第二位教师审批放行</span>
         <button class="secondary slim-btn" @click="requestApproval(pendingApproval)">发起修改审批</button>
-      </template>
-    </div>
+      </div>
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import { api } from '../../api'
+import { useAsyncData, describeError } from '../../composables/useAsyncData'
+import { useToast } from '../../composables/useToast'
 
-const items = ref([])
-const classes = ref([])
-const loading = ref(true)
+const toast = useToast()
 const saving = ref(false)
-const msg = ref('')
-const errMsg = ref('')
+// 考试锁定后需要用户"发起审批"，属于可操作状态，保留为内联提示
 const pendingApproval = ref(null)
 
 const ACTION_LABELS = {
@@ -99,34 +110,31 @@ const ACTION_LABELS = {
   CHANGE_GRADE: '成绩修订'
 }
 
-onMounted(load)
-
-async function load() {
-  loading.value = true
-  try {
-    const [cls, list] = await Promise.all([api('/teacher/classes'), api('/teacher/assignments')])
-    classes.value = cls
-    items.value = list.map(a => {
-      const item = { ...a, approvals: null, targets: a.targets || [] }
-      for (const t of item.targets) {
-        t.publishAt = sliceTime(t.publishAt)
-        t.deadline = sliceTime(t.deadline)
-      }
-      return item
-    })
-    for (const a of items.value) {
-      if (a.mode === 'EXAM') {
-        try {
-          a.approvals = await api(`/teacher/exams/${a.id}/approvals`)
-        } catch { a.approvals = null }
+const { data, loading, error, load } = useAsyncData(async () => {
+  const [cls, list] = await Promise.all([api('/teacher/classes'), api('/teacher/assignments')])
+  const mapped = list.map((a) => {
+    const item = { ...a, approvals: null, targets: a.targets || [] }
+    for (const t of item.targets) {
+      t.publishAt = sliceTime(t.publishAt)
+      t.deadline = sliceTime(t.deadline)
+    }
+    return item
+  })
+  // 审批列表为附属信息，单项失败不影响主列表可用性
+  for (const a of mapped) {
+    if (a.mode === 'EXAM') {
+      try {
+        a.approvals = await api(`/teacher/exams/${a.id}/approvals`)
+      } catch {
+        a.approvals = null
       }
     }
-  } catch (e) {
-    fail(e)
-  } finally {
-    loading.value = false
   }
-}
+  return { items: mapped, classes: cls }
+}, { initial: { items: [], classes: [] } })
+
+const items = computed(() => data.value?.items ?? [])
+const classes = computed(() => data.value?.classes ?? [])
 
 async function saveRules(a, t) {
   saving.value = true
@@ -144,7 +152,7 @@ async function saveRules(a, t) {
     notify(`已保存 #${a.id} ${className(t.teachingClassId)} 的规则`)
     await load()
   } catch (e) {
-    errMsg.value = e.message
+    toast.error(describeError(e))
     if (isExamLocked(e) && a.mode === 'EXAM') {
       pendingApproval.value = a
     }
@@ -161,7 +169,7 @@ async function collect(a, t) {
     notify(`已收卷 #${a.id} ${className(t.teachingClassId)}`)
     await load()
   } catch (e) {
-    errMsg.value = e.message
+    toast.error(describeError(e))
     if (isExamLocked(e) && a.mode === 'EXAM') pendingApproval.value = a
   } finally {
     saving.value = false
@@ -244,58 +252,56 @@ function normTime(v) { return v && v.length === 16 ? v + ':00' : (v || null) }
 function sliceTime(v) { return v ? String(v).slice(0, 16) : '' }
 
 function notify(text) {
-  msg.value = text
-  errMsg.value = ''
-  setTimeout(() => { if (msg.value === text) msg.value = '' }, 5000)
+  toast.success(text)
 }
 function fail(e) {
-  errMsg.value = e.message
-  msg.value = ''
+  toast.error(describeError(e))
 }
 </script>
 
 <style scoped>
-.section-row { margin-bottom: 12px; }
+.section-row { margin-bottom: var(--space-3); }
 .section-row h3 { margin: 0; }
-.slim-btn { padding: 5px 12px; font-size: 13px; }
+.slim-btn { padding: 5px 12px; font-size: var(--fs-sm); }
 .row-op { display: flex; gap: 6px; }
 .mini {
-  background: #fff;
+  background: var(--panel);
   border: 1px solid var(--border);
   box-shadow: none;
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: var(--space-1) 10px;
+  font-size: var(--fs-xs);
   border-radius: 7px;
 }
-.mini:hover:not(:disabled) { box-shadow: none; background: var(--panel-2); }
-.mini.green { color: var(--ok); border-color: #bbe7d4; }
+.mini:hover:not(:disabled) { box-shadow: none; background: var(--panel-2); transform: none; }
+.mini.green { color: var(--ok); border-color: color-mix(in srgb, var(--ok) 38%, transparent); }
 .mini.green:hover:not(:disabled) { background: var(--ok-soft); }
-.mini.warn { color: var(--danger); border-color: #fecaca; }
+.mini.warn { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 32%, transparent); }
 .mini.warn:hover:not(:disabled) { background: var(--danger-soft); }
 .approvals { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 10px; }
-.approvals h4 { margin: 4px 0 10px; font-size: 14px; }
-.approvals table { margin-bottom: 8px; }
+.approvals h4 { margin: var(--space-1) 0 10px; font-size: var(--fs-base); }
+.approvals table { margin-bottom: var(--space-2); }
 .mono { font-family: Consolas, monospace; }
-.ok-banner {
-  background: var(--ok-soft);
-  color: var(--ok);
-  border: 1px solid #bbe7d4;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  margin-top: 4px;
+/* 提示条过渡：滑入淡出，减少布局跳动 */
+.alert-enter-active,
+.alert-leave-active {
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
-.err-banner {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  margin-top: 4px;
+.alert-enter-from,
+.alert-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* 考试锁定提示：需要用户执行下一步动作，故保留在页面内而不是一次性消息 */
+.lock-notice {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
+  margin-top: var(--space-1);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border: 1px solid color-mix(in srgb, var(--warn) 35%, transparent);
 }
+.lock-notice .slim-btn { margin-left: auto; }
 </style>

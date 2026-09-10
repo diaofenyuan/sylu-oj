@@ -1,10 +1,12 @@
 <template>
-  <div class="shortcut-help" v-if="visible" @click.self="$emit('close')">
+  <AppOverlay :open="visible" placement="center" aria-label="快捷键帮助"
+              @close="$emit('close')">
     <div class="help-content">
       <div class="help-header">
         <Icon icon="mdi:keyboard" class="keyboard-icon" />
         <h3>快捷键帮助</h3>
-        <button class="close-btn" @click="$emit('close')">
+        <button type="button" class="close-btn" aria-label="关闭"
+                @click="$emit('close')">
           <Icon icon="mdi:close" />
         </button>
       </div>
@@ -142,7 +144,7 @@
         <p>提示：按 <kbd>Ctrl</kbd> + <kbd>/</kbd> 可随时打开此帮助</p>
       </div>
     </div>
-  </div>
+  </AppOverlay>
 </template>
 
 <script setup>
@@ -154,20 +156,6 @@ defineEmits(['close'])
 </script>
 
 <style scoped>
-.shortcut-help {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
 
 .help-content {
   background: var(--panel);
@@ -184,8 +172,8 @@ defineEmits(['close'])
 .help-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: var(--space-3);
+  padding: var(--space-5) 24px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -197,7 +185,7 @@ defineEmits(['close'])
 .help-header h3 {
   flex: 1;
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-2xl);
   color: var(--text);
 }
 
@@ -221,7 +209,7 @@ defineEmits(['close'])
 .help-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: var(--space-5) 24px;
 }
 
 .shortcut-section {
@@ -235,9 +223,9 @@ defineEmits(['close'])
 .shortcut-section h4 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0 0 12px;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--text);
   font-weight: 600;
 }
@@ -245,17 +233,17 @@ defineEmits(['close'])
 .shortcut-list {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .shortcut-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: var(--space-3) 16px;
   background: var(--panel-2);
   border-radius: 8px;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
 }
 
 .shortcut-item:hover {
@@ -272,13 +260,13 @@ defineEmits(['close'])
 
 kbd {
   display: inline-block;
-  padding: 4px 8px;
+  padding: var(--space-1) 8px;
   background: var(--panel);
   border: 1px solid var(--border-strong);
   border-radius: 4px;
   box-shadow: 0 2px 0 var(--border-strong);
   font-family: 'Segoe UI', system-ui, sans-serif;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text);
   line-height: 1;
@@ -294,29 +282,29 @@ kbd {
 
 .shortcut-desc {
   color: var(--muted);
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .help-footer {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px 24px;
+  gap: var(--space-2);
+  padding: var(--space-4) 24px;
   border-top: 1px solid var(--border);
   background: var(--panel-2);
 }
 
 .help-footer p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .help-footer kbd {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   padding: 2px 6px;
 }
 
@@ -324,7 +312,7 @@ kbd {
   .shortcut-item {
     flex-direction: column;
     align-items: flex-start;
-    gap: 8px;
+    gap: var(--space-2);
   }
   
   .shortcut-keys {

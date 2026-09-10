@@ -186,7 +186,7 @@ async function copy(text) {
   border: 1px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
 
 .compare-header {
@@ -201,9 +201,9 @@ async function copy(text) {
 .compare-header h4 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-md);
 }
 
 .icon-success {
@@ -217,35 +217,35 @@ async function copy(text) {
 .compare-meta {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .meta-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 13px;
+  gap: var(--space-1);
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 .compare-body {
-  padding: 16px;
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .io-section, .output-column {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .section-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
   color: var(--text);
 }
 
@@ -254,14 +254,14 @@ async function copy(text) {
 }
 
 .copy-btn {
-  padding: 4px 10px;
-  font-size: 12px;
+  padding: var(--space-1) 10px;
+  font-size: var(--fs-xs);
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--muted);
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .copy-btn:hover {
@@ -273,10 +273,10 @@ async function copy(text) {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 12px;
+  padding: var(--space-3);
   margin: 0;
   font-family: 'Cascadia Code', 'JetBrains Mono', monospace;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1.6;
   white-space: pre-wrap;
   word-break: break-all;
@@ -288,7 +288,7 @@ async function copy(text) {
 .compare-section {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .expected-column .section-header {
@@ -309,12 +309,12 @@ async function copy(text) {
 
 .diff-info {
   display: flex;
-  gap: 12px;
-  padding: 12px;
+  gap: var(--space-3);
+  padding: var(--space-3);
   background: var(--warn-soft);
   border: 1px solid var(--warn);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .diff-details {
@@ -328,42 +328,42 @@ async function copy(text) {
 
 .diff-details ul {
   margin: 0;
-  padding-left: 20px;
+  padding-left: var(--space-5);
 }
 
 .diff-details li {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
 .compare-footer {
-  padding: 12px 16px;
+  padding: var(--space-3) 16px;
   border-top: 1px solid var(--border);
   background: var(--panel-2);
 }
 
 .toggle-btn {
   padding: 6px 12px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   background: var(--panel);
   border: 1px solid var(--border);
   color: var(--muted);
 }
 
 .raw-display {
-  margin-top: 12px;
+  margin-top: var(--space-3);
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .raw-item {
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .raw-item code {
   display: block;
-  margin-top: 4px;
-  padding: 8px;
+  margin-top: var(--space-1);
+  padding: var(--space-2);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 4px;

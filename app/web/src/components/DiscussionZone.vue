@@ -407,7 +407,7 @@ function deleteDiscussion(disc) {
 .discussion-zone {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .discussion-header {
@@ -419,12 +419,12 @@ function deleteDiscussion(disc) {
 .discussion-header h3 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 
 .count {
-  font-size: 14px;
+  font-size: var(--fs-base);
   color: var(--muted);
   font-weight: 400;
 }
@@ -448,7 +448,7 @@ function deleteDiscussion(disc) {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 12px;
+  padding: var(--space-3);
   background: var(--panel-2);
   border: none;
   color: var(--muted);
@@ -462,28 +462,28 @@ function deleteDiscussion(disc) {
 }
 
 .editor-body, .preview-body {
-  padding: 16px;
+  padding: var(--space-4);
 }
 
 .title-input {
   width: 100%;
-  padding: 12px;
-  margin-bottom: 12px;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   font-weight: 600;
 }
 
 .content-textarea {
   width: 100%;
-  padding: 12px;
+  padding: var(--space-3);
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 8px;
   font-family: 'Cascadia Code', monospace;
-  font-size: 14px;
+  font-size: var(--fs-base);
   line-height: 1.6;
   resize: vertical;
 }
@@ -492,12 +492,12 @@ function deleteDiscussion(disc) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-top: 12px;
+  margin-top: var(--space-3);
 }
 
 .toolbar-left {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .toolbar-left button {
@@ -518,7 +518,7 @@ function deleteDiscussion(disc) {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 8px 16px;
+  padding: var(--space-2) 16px;
   background: var(--accent);
   color: #fff;
 }
@@ -532,7 +532,7 @@ function deleteDiscussion(disc) {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: var(--space-2);
   padding: 60px 20px;
   color: var(--muted);
 }
@@ -542,7 +542,7 @@ function deleteDiscussion(disc) {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
+  padding: var(--space-3) 16px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -550,7 +550,7 @@ function deleteDiscussion(disc) {
 
 .filter-tabs {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .filter-tabs button {
@@ -558,7 +558,7 @@ function deleteDiscussion(disc) {
   background: transparent;
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .filter-tabs button.active {
@@ -572,22 +572,22 @@ function deleteDiscussion(disc) {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 /* 讨论列表 */
 .discussion-list {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .discussion-card {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
-  transition: all 0.2s ease;
+  padding: var(--space-5);
+  transition: all var(--dur-base) var(--ease-out);
 }
 
 .discussion-card:hover {
@@ -606,12 +606,12 @@ function deleteDiscussion(disc) {
 .disc-header {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .author-info {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .avatar {
@@ -623,19 +623,19 @@ function deleteDiscussion(disc) {
   display: grid;
   place-items: center;
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 
 .avatar.small {
   width: 32px;
   height: 32px;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .author-detail {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .author-name {
@@ -652,7 +652,7 @@ function deleteDiscussion(disc) {
   gap: 3px;
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
 }
 
@@ -669,8 +669,8 @@ function deleteDiscussion(disc) {
 .disc-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 12px;
+  gap: var(--space-2);
+  font-size: var(--fs-xs);
   color: var(--muted);
 }
 
@@ -683,7 +683,7 @@ function deleteDiscussion(disc) {
 
 .disc-actions {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .disc-actions button {
@@ -700,12 +700,12 @@ function deleteDiscussion(disc) {
 }
 
 .disc-body {
-  margin-bottom: 16px;
+  margin-bottom: var(--space-4);
 }
 
 .disc-title {
   margin: 0 0 12px;
-  font-size: 18px;
+  font-size: var(--fs-xl);
   color: var(--text);
 }
 
@@ -716,20 +716,20 @@ function deleteDiscussion(disc) {
 
 .markdown-content :deep(pre) {
   background: var(--panel-2);
-  padding: 12px;
+  padding: var(--space-3);
   border-radius: 6px;
   overflow-x: auto;
 }
 
 .markdown-content :deep(code) {
   font-family: 'Cascadia Code', monospace;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .disc-footer {
   display: flex;
-  gap: 12px;
-  padding-top: 12px;
+  gap: var(--space-3);
+  padding-top: var(--space-3);
   border-top: 1px solid var(--border);
 }
 
@@ -741,7 +741,7 @@ function deleteDiscussion(disc) {
   background: var(--panel-2);
   border: 1px solid var(--border);
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .action-btn.liked {
@@ -752,39 +752,39 @@ function deleteDiscussion(disc) {
 
 /* 回复区域 */
 .replies-section {
-  margin-top: 16px;
-  padding-top: 16px;
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--border);
 }
 
 .reply-card {
-  padding: 12px;
+  padding: var(--space-3);
   background: var(--panel-2);
   border-radius: 8px;
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 
 .reply-header {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
 }
 
 .reply-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: var(--space-2);
+  font-size: var(--fs-sm);
 }
 
 .reply-meta {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--fs-xs);
 }
 
 .reply-content {
-  font-size: 14px;
+  font-size: var(--fs-base);
   color: var(--text);
   line-height: 1.6;
 }
@@ -792,8 +792,8 @@ function deleteDiscussion(disc) {
 .reply-editor {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  margin-top: 12px;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
 }
 
 .reply-editor textarea {
@@ -802,7 +802,7 @@ function deleteDiscussion(disc) {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 6px;
-  font-size: 14px;
+  font-size: var(--fs-base);
   resize: vertical;
 }
 
@@ -820,7 +820,7 @@ function deleteDiscussion(disc) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 60px 20px;
   color: var(--muted);
   text-align: center;
@@ -834,7 +834,7 @@ function deleteDiscussion(disc) {
 @media (max-width: 768px) {
   .filter-bar {
     flex-direction: column;
-    gap: 12px;
+    gap: var(--space-3);
   }
   
   .filter-tabs {

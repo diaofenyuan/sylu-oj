@@ -1,0 +1,279 @@
+/* =============================================================================
+ * motion.css — 全局动效体系
+ * -----------------------------------------------------------------------------
+ * 职责：
+ *   1. 集中定义动效设计令牌（时长 / 缓动曲线 / 位移距离）
+ *   2. 提供通用关键帧动画与原子工具类
+ *   3. 提供路由页面过渡、元素入场揭示、骨架屏、加载指示器样式
+ *   4. 统一处理 prefers-reduced-motion 无障碍降级
+ * 约定：
+ *   - 业务组件优先复用本文件的令牌与工具类，避免散落硬编码数值
+ *   - 仅使用 opacity / transform 做动画，保证合成层渲染、避免重排重绘
+ * ========================================================================== */
+
+:root {
+  /* ---- 时长令牌（毫秒）---- */
+  --dur-instant: 90ms;   /* 即时反馈：按下、勾选 */
+  --dur-fast: 160ms;      /* 快速过渡：hover、focus */
+  --dur-base: 240ms;      /* 基础过渡：展开、淡入 */
+  --dur-slow: 360ms;      /* 慢速过渡：页面入场、面板切换 */
+  --dur-slower: 520ms;    /* 强调过渡：英雄区入场 */
+
+  /* ---- 缓动曲线 ---- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);            /* 出场：自然减速 */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);         /* 双向：位移 */
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);       /* 弹性：强调反馈 */
+  --ease-standard: cubic-bezier(0.4, 0, 0.2, 1);         /* 标准：Material */
+
+  /* ---- 位移距离 ---- */
+  --shift-sm: 8px;
+  --shift-md: 16px;
+  --shift-lg: 24px;
+
+  /* ---- 层级 ---- */
+  --z-progress: 120;
+  --z-overlay: 140;  /* 弹层：抽屉、对话框 */
+  --z-toast: 160;    /* 提示需要盖在弹层之上，避免弹层打开时提示被遮挡 */
+
+  /* ---- 圆角扩展 ---- */
+  --radius-lg: 16px;
+  --radius-xl: 20px;
+
+  /* ---- 阴影扩展 ---- */
+  --shadow-accent: 0 8px 24px rgba(37, 99, 235, 0.22);
+}
+
+.dark {
+  --shadow-accent: 0 8px 24px rgba(59, 130, 246, 0.28);
+}
+
+/* =============================================================================
+ * 1. 关键帧动画
+ * ========================================================================== */
+
+@keyframes m-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes m-fade-in-up {
+  from { opacity: 0; transform: translate3d(0, var(--shift-md), 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes m-fade-in-down {
+  from { opacity: 0; transform: translate3d(0, calc(-1 * var(--shift-md)), 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes m-scale-in {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes m-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
+
+@keyframes m-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes m-shimmer {
+  100% { transform: translateX(100%); }
+}
+
+@keyframes m-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-5px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(3px); }
+}
+
+@keyframes m-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+/* 顶部进度条：不确定进度的缓冲动画 */
+@keyframes m-indeterminate {
+  0% { transform: translateX(-100%) scaleX(0.2); }
+  50% { transform: translateX(0) scaleX(0.6); }
+  100% { transform: translateX(100%) scaleX(0.2); }
+}
+
+/* =============================================================================
+ * 2. 原子工具类
+ * ========================================================================== */
+
+.anim-fade-in { animation: m-fade-in var(--dur-base) var(--ease-out) both; }
+.anim-fade-up { animation: m-fade-in-up var(--dur-slow) var(--ease-out) both; }
+.anim-fade-down { animation: m-fade-in-down var(--dur-slow) var(--ease-out) both; }
+.anim-scale-in { animation: m-scale-in var(--dur-slow) var(--ease-spring) both; }
+
+/* 交错延迟：配合 v-for 索引使用 —— style="--stagger-i: 3" */
+.anim-stagger { animation-delay: calc(var(--stagger-i, 0) * 55ms); }
+
+/* =============================================================================
+ * 3. 元素入场揭示（配合 v-reveal 指令）
+ * ========================================================================== */
+
+.reveal {
+  opacity: 0;
+  will-change: opacity, transform;
+}
+
+.reveal-up { transform: translate3d(0, var(--shift-md), 0); }
+.reveal-down { transform: translate3d(0, calc(-1 * var(--shift-md)), 0); }
+.reveal-left { transform: translate3d(calc(-1 * var(--shift-lg)), 0, 0); }
+.reveal-right { transform: translate3d(var(--shift-lg), 0, 0); }
+.reveal-zoom { transform: scale(0.96); }
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0) scale(1);
+  transition:
+    opacity var(--dur-slower) var(--ease-out),
+    transform var(--dur-slower) var(--ease-out);
+  transition-delay: var(--reveal-delay, 0ms);
+  will-change: auto;
+}
+
+/* =============================================================================
+ * 4. 路由页面过渡
+ * ========================================================================== */
+
+/* 常规页面：淡入上移，离开时轻微下移 */
+.page-slide-enter-active {
+  transition: opacity var(--dur-base) var(--ease-out),
+              transform var(--dur-base) var(--ease-out);
+}
+.page-slide-leave-active {
+  transition: opacity var(--dur-fast) var(--ease-standard),
+              transform var(--dur-fast) var(--ease-standard);
+}
+.page-slide-enter-from { opacity: 0; transform: translate3d(0, var(--shift-sm), 0); }
+.page-slide-leave-to { opacity: 0; transform: translate3d(0, calc(-1 * var(--shift-sm)), 0); }
+
+/* 全屏工作台：仅淡入淡出，避免布局位移 */
+.page-fade-enter-active,
+.page-fade-leave-active { transition: opacity var(--dur-fast) ease; }
+.page-fade-enter-from,
+.page-fade-leave-to { opacity: 0; }
+
+/* =============================================================================
+ * 5. 加载态：骨架屏 / 旋转指示器
+ * ========================================================================== */
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--panel-2);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.18), transparent);
+  animation: m-shimmer 1.5s var(--ease-in-out) infinite;
+}
+
+.dark .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.06), transparent);
+}
+
+/* 骨架文本行：宽度可通过 --skeleton-w 覆盖 */
+.skeleton-line {
+  height: 12px;
+  border-radius: 999px;
+  margin-bottom: 10px;
+  width: var(--skeleton-w, 100%);
+}
+.skeleton-line:last-child { margin-bottom: 0; }
+
+/* 通用旋转指示器（继承 currentColor） */
+.spinner {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  opacity: 0.9;
+  animation: m-spin 0.7s linear infinite;
+}
+
+.spinner-lg { width: 24px; height: 24px; border-width: 2.5px; }
+
+/* 全屏/区块加载遮罩 */
+.loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+  animation: m-fade-in var(--dur-fast) ease both;
+  z-index: 5;
+}
+
+/* =============================================================================
+ * 6. 路由顶部进度条
+ * ========================================================================== */
+
+.route-progress {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  z-index: var(--z-progress);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
+}
+
+.route-progress.active { opacity: 1; }
+
+.route-progress .bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #3b82f6, #2563eb 55%, #0ea5e9);
+  box-shadow: 0 0 10px rgba(59, 130, 246, 0.6), 0 0 4px rgba(59, 130, 246, 0.45);
+  border-radius: 0 2px 2px 0;
+  transition: width var(--dur-base) var(--ease-out);
+  will-change: width;
+}
+
+.route-progress.done .bar { transition: width 140ms ease-out; }
+
+/* =============================================================================
+ * 7. 无障碍：尊重系统减弱动效偏好
+ * ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .reveal {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .route-progress { display: none; }
+}

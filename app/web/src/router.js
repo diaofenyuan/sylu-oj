@@ -1,18 +1,20 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from './views/Login.vue'
-import AdminHome from './views/admin/AdminHome.vue'
-import TeacherClasses from './views/teacher/Classes.vue'
-import TeacherProblemBank from './views/teacher/ProblemBank.vue'
-import TeacherAssignmentEditor from './views/teacher/AssignmentEditor.vue'
-import TeacherAssignmentsManage from './views/teacher/AssignmentsManage.vue'
-import TeacherAnalytics from './views/teacher/Analytics.vue'
-import TeacherAnalyticsEnhanced from './views/teacher/AnalyticsEnhanced.vue'
-import StudentHome from './views/student/StudentHome.vue'
-import StudentAssignment from './views/student/StudentAssignment.vue'
-import StudentPractice from './views/student/StudentPractice.vue'
-import ContestMode from './components/ContestMode.vue'
 import { getRole, refreshRole } from './auth'
 import { getToken } from './api'
+
+// 除登录页外均按需加载：显著减小首屏包体，加快登录页可达时间
+const AdminHome = () => import('./views/admin/AdminHome.vue')
+const TeacherClasses = () => import('./views/teacher/Classes.vue')
+const TeacherProblemBank = () => import('./views/teacher/ProblemBank.vue')
+const TeacherAssignmentEditor = () => import('./views/teacher/AssignmentEditor.vue')
+const TeacherAssignmentsManage = () => import('./views/teacher/AssignmentsManage.vue')
+const TeacherAnalytics = () => import('./views/teacher/Analytics.vue')
+const TeacherAnalyticsEnhanced = () => import('./views/teacher/AnalyticsEnhanced.vue')
+const StudentHome = () => import('./views/student/StudentHome.vue')
+const StudentAssignment = () => import('./views/student/StudentAssignment.vue')
+const StudentPractice = () => import('./views/student/StudentPractice.vue')
+const ContestMode = () => import('./components/ContestMode.vue')
 
 const TEACHER_ROLES = ['TEACHER', 'ADMIN']
 
@@ -32,7 +34,19 @@ const router = createRouter({
     { path: '/student/practice', component: StudentPractice, meta: { area: 'student' } },
     { path: '/student/targets/:targetId', component: StudentAssignment, meta: { area: 'student' } },
     { path: '/student/contest/:contestId', component: ContestMode, props: route => ({ contestId: Number(route.params.contestId) }), meta: { area: 'student' } }
-  ]
+  ],
+  /**
+   * 路由切换后回到页面顶部。
+   * - 浏览器前进/后退时恢复历史滚动位置
+   * - 同一路径（仅参数变化）不打断用户当前滚动
+   * - 尊重系统"减弱动效"偏好，关闭平滑滚动
+   */
+  scrollBehavior(to, from, savedPosition) {
+    if (savedPosition) return savedPosition
+    if (to.path === from.path) return false
+    const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    return { top: 0, behavior: reduce ? 'auto' : 'smooth' }
+  }
 })
 
 async function resolveRole() {

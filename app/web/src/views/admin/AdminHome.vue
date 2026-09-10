@@ -1,15 +1,26 @@
 <template>
   <div>
-    <div class="page-head">
+    <div class="page-head" v-reveal>
       <h2>管理控制台</h2>
       <p class="muted">维护学期、专业、课程、教学班、师生与授课关系，查看审计事件</p>
     </div>
 
-    <div class="tabs">
+    <div class="tabs" v-reveal="{ delay: 60 }">
       <button v-for="t in tabs" :key="t.key" class="tab" :class="{ active: tab === t.key }" @click="tab = t.key">
         {{ t.label }}
       </button>
     </div>
+
+    <!-- 标签内容：切换时淡入淡出，保持上下文连续感 -->
+    <Transition name="tab" mode="out-in">
+    <div :key="tab" class="tab-panel">
+
+    <!-- 首次加载：数据未就绪时用表格骨架占位，避免先渲染空表再突然填充 -->
+    <template v-if="loading">
+      <SkeletonTable :rows="4" :cols="4" />
+      <SkeletonTable :rows="3" :cols="3" />
+    </template>
+    <template v-else>
 
     <!-- 一键开通向导 -->
     <template v-if="tab === 'wizard'">
@@ -86,7 +97,7 @@
           </div>
         </div>
 
-        <div class="row" style="margin-top: 16px;">
+        <div class="row" style="margin-top: var(--space-4);">
           <button :disabled="wizRunning" @click="runWizard">{{ wizRunning ? '开通中…' : '一键开通' }}</button>
           <span class="muted">已选 {{ wizardStudentCount }} 名学生</span>
         </div>
@@ -260,7 +271,10 @@
                   <td><button v-if="!e.endedAt" class="danger slim-btn" @click="endEnrollment(e.id)">移出</button></td>
                 </tr>
               </tbody>
-        </table>
+            </table>
+          </div>
+        </template>
+        <div v-else class="empty">请先选择教学班</div>
       </div>
     </template>
 
@@ -271,7 +285,7 @@
           <h3>本地账号</h3>
           <p class="muted" style="margin: 0;">支持多个管理员；角色任意切换，停用后立即禁止登录。主管理员（bootstrap）启动时自动恢复启用、不可移除</p>
         </div>
-        <div class="row" style="margin-bottom: 12px;">
+        <div class="row" style="margin-bottom: var(--space-3);">
           <select v-model="acctForm.role" class="slim">
             <option value="ADMIN">管理员</option>
             <option value="TEACHER">教师</option>
@@ -294,9 +308,6 @@
             </tr>
           </tbody>
         </table>
-      </div>
-    </template>
-        <div v-else class="empty">请先选择教学班</div>
       </div>
     </template>
 
@@ -324,14 +335,21 @@
         <div v-if="audits.length === 0" class="empty">暂无审计事件</div>
       </div>
     </template>
+    </template>
 
-    <div v-if="message" class="msg" :class="{ ok: msgOk, bad: !msgOk }">{{ message }}</div>
+    </div>
+    </Transition>
+
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../../api'
+import { describeError } from '../../composables/useAsyncData'
+import { useToast } from '../../composables/useToast'
+
+const toast = useToast()
 
 const tabs = [
   { key: 'wizard', label: '一键开通' },
@@ -353,8 +371,7 @@ const teacherAssignments = ref([])
 const enrollments = ref([])
 const accounts = ref([])
 const audits = ref([])
-const message = ref('')
-const msgOk = ref(true)
+// 提示统一走全局 Toast，不再维护本地提示条状态
 
 const termForm = ref({ code: '', name: '', startDate: '', endDate: '' })
 const majorForm = ref({ code: '', name: '' })
@@ -392,14 +409,22 @@ const wizardStudentCount = computed(() =>
   wiz.value.studentsText.split('\n').map(s => s.trim()).filter(Boolean).length
 )
 
+const loading = ref(true)
+
 onMounted(async () => {
-  await Promise.all([loadTerms(), loadMajors(), loadCourses(), loadClasses(), loadTeachers(), loadStudents(), loadAccounts(), loadAudit()])
+  // 各标签页的数据并行加载，全部就绪后再统一渲染，避免表格逐个"跳"出来
+  try {
+    await Promise.all([loadTerms(), loadMajors(), loadCourses(), loadClasses(), loadTeachers(), loadStudents(), loadAccounts(), loadAudit()])
+  } catch (e) {
+    toast.error(describeError(e))
+  } finally {
+    loading.value = false
+  }
 })
 
 function notify(text, ok = true) {
-  message.value = text
-  msgOk.value = ok
-  setTimeout(() => { if (message.value === text) message.value = '' }, 4000)
+  if (ok) toast.success(text)
+  else toast.error(text)
 }
 
 async function run(action) {
@@ -407,7 +432,7 @@ async function run(action) {
     await action()
     notify('操作成功')
   } catch (e) {
-    notify(e.message, false)
+    notify(describeError(e), false)
   }
 }
 
@@ -508,27 +533,45 @@ function fmtTime(v) { return v ? String(v).replace('T', ' ').slice(0, 19) : '' }
 </script>
 
 <style scoped>
-.tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+.tabs { display: flex; gap: var(--space-2); margin-bottom: 18px; flex-wrap: wrap; }
 .tab {
-  padding: 8px 18px;
+  padding: var(--space-2) 18px;
   border-radius: 10px;
   border: 1px solid var(--border);
-  background: #fff;
+  background: var(--panel);
   color: var(--muted);
   font-weight: 600;
 }
-.tab.active { color: var(--accent); background: var(--accent-soft); border-color: #c7d9ff; }
+.tab:hover:not(.active) { transform: none; background: var(--panel-2); }
+.tab.active {
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-color: color-mix(in srgb, var(--accent) 34%, transparent);
+}
+
+/* 标签面板切换过渡 */
+.tab-enter-active {
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
+}
+.tab-leave-active {
+  transition: opacity var(--dur-fast) ease, transform var(--dur-fast) ease;
+}
+.tab-enter-from { opacity: 0; transform: translateY(8px); }
+.tab-leave-to { opacity: 0; transform: translateY(-6px); }
+
+/* 全局提示条过渡（仅淡入淡出，避免覆盖居中位移） */
+
 .section { padding: 18px 20px; margin-bottom: 18px; }
 .section-head { margin-bottom: 14px; }
-.section-head h3 { margin: 0; font-size: 16px; }
+.section-head h3 { margin: 0; font-size: var(--fs-lg); }
 .slim { width: auto; }
 .tiny { width: 90px; }
-.slim-btn { padding: 5px 12px; font-size: 13px; }
-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.slim-btn { padding: 5px 12px; font-size: var(--fs-sm); }
+table { width: 100%; border-collapse: collapse; font-size: var(--fs-base); }
 th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
-th { color: var(--muted); font-weight: 600; font-size: 13px; }
+th { color: var(--muted); font-weight: 600; font-size: var(--fs-sm); }
 tr:last-child td { border-bottom: none; }
-.assign-block { margin-bottom: 24px; }
+.assign-block { margin-bottom: var(--space-6); }
 .assign-block:last-child { margin-bottom: 0; }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--muted); }
 .wiz-grid {
@@ -542,9 +585,9 @@ tr:last-child td { border-bottom: none; }
   padding: 14px 16px;
   background: var(--panel-2);
 }
-.wiz-block h4 { margin: 0 0 10px; font-size: 14px; color: var(--accent); }
+.wiz-block h4 { margin: 0 0 10px; font-size: var(--fs-base); color: var(--accent); }
 .wiz-full { grid-column: 1 / -1; }
-.wiz-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.wiz-fields { display: flex; flex-direction: column; gap: var(--space-2); margin-top: 10px; }
 .wiz-fields input { width: 100%; }
 .wide { width: 100%; }
 .wiz-block textarea { width: 100%; resize: vertical; font-family: inherit; }
@@ -553,24 +596,11 @@ tr:last-child td { border-bottom: none; }
   background: #0f172a;
   color: #d7e3f4;
   border-radius: 10px;
-  padding: 12px 16px;
-  font-size: 13px;
+  padding: var(--space-3) 16px;
+  font-size: var(--fs-sm);
   font-family: Consolas, monospace;
   max-height: 220px;
   overflow-y: auto;
 }
 .wiz-log .bad { color: #fca5a5; }
-.msg {
-  position: fixed;
-  bottom: 26px;
-  left: 50%;
-  transform: translateX(-50%);
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 14px;
-  box-shadow: var(--shadow-lg);
-  z-index: 100;
-}
-.msg.ok { background: var(--ok-soft); color: var(--ok); border: 1px solid #bbe7c9; }
-.msg.bad { background: var(--danger-soft); color: var(--danger); border: 1px solid #fecaca; }
 </style>

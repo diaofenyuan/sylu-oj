@@ -6,6 +6,26 @@
     <meta name="description" content="SYLU-OJ 在线判题系统 · 面向教学场景的编程题自动评测平台" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563eb'/%3E%3Ctext x='16' y='21' font-family='Arial' font-size='13' font-weight='bold' fill='white' text-anchor='middle'%3EOJ%3C/text%3E%3C/svg%3E" />
     <title>SYLU-OJ · 在线判题系统</title>
+    <script>
+      /**
+       * 首帧前应用主题，消除暗色模式下的白色闪烁（FOUC）。
+       * 主题类此前由 App.vue 的 onMounted 写入，早于此刻的首帧已按亮色渲染。
+       * 判定规则必须与 src/composables/useTheme.js 保持一致，改动时两处同步。
+       */
+      (function () {
+        try {
+          var theme = localStorage.getItem('oj-theme') || 'auto'
+          var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+          var isDark = theme === 'dark' || (theme === 'auto' && prefersDark)
+          document.documentElement.classList.toggle('dark', isDark)
+        } catch (e) {
+          /* 隐私模式等场景下 localStorage 不可用，降级为跟随系统 */
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            document.documentElement.classList.add('dark')
+          }
+        }
+      })()
+    </script>
   </head>
   <body>
     <div id="app"></div>

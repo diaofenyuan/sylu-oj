@@ -2,7 +2,7 @@
   <div class="landing">
     <div class="bg-deco" aria-hidden="true"></div>
 
-    <header class="landing-top">
+    <header class="landing-top" v-reveal="'down'">
       <div class="brand">
         <span class="logo">OJ</span>
         <span class="brand-name">SYLU-OJ</span>
@@ -17,46 +17,28 @@
 
     <div class="landing-body">
       <section class="hero">
-        <span class="badge">教师端 · 内测版</span>
-        <h1>为教学而生的<br /><span class="grad">在线判题平台</span></h1>
-        <p class="lead">
+        <span class="badge" v-reveal="{ delay: 40 }">教师端 · 内测版</span>
+        <h1 v-reveal="{ delay: 110 }">为教学而生的<br /><span class="grad">在线判题平台</span></h1>
+        <p class="lead" v-reveal="{ delay: 180 }">
           题目管理、组卷发布、自动评测与成绩分析一站式完成。
           把重复的批改工作交给机器，把更多时间还给学生。
         </p>
         <ul class="features">
-          <li>
+          <li v-for="(f, i) in features" :key="f.title" v-reveal="{ delay: 240 + i * 80 }">
             <span class="f-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" /></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path :d="f.path" /></svg>
             </span>
             <div class="f-text">
-              <strong>秒级自动判题</strong>
-              <span>提交即刻评测，编译错误与用例结果实时反馈</span>
-            </div>
-          </li>
-          <li>
-            <span class="f-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>
-            </span>
-            <div class="f-text">
-              <strong>安全沙箱运行</strong>
-              <span>受限环境隔离执行代码，资源与网络严格管控</span>
-            </div>
-          </li>
-          <li>
-            <span class="f-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10" /><path d="M10 20V4" /><path d="M16 20v-7" /><path d="M22 20H2" /></svg>
-            </span>
-            <div class="f-text">
-              <strong>成绩分析导出</strong>
-              <span>多维统计班级表现，一键导出 XLSX / CSV</span>
+              <strong>{{ f.title }}</strong>
+              <span>{{ f.desc }}</span>
             </div>
           </li>
         </ul>
-        <p class="langs">支持 C · C++ · Java · Python 多语言评测</p>
+        <p class="langs" v-reveal="{ delay: 500 }">支持 C · C++ · Java · Python 多语言评测</p>
       </section>
 
       <section class="login-side">
-        <div class="card login-card">
+        <div class="card login-card" v-reveal="{ variant: 'zoom', delay: 140 }">
           <h2 class="card-title">登录教师端</h2>
           <p class="muted card-sub">内测阶段使用开发/内测合成账号登录</p>
           <form @submit.prevent="submit">
@@ -68,12 +50,13 @@
               <span>密码</span>
               <input v-model="password" type="password" placeholder="请输入密码" autocomplete="current-password" />
             </label>
-            <button type="submit" class="submit" :disabled="loading">
-              <span v-if="loading" class="spinner"></span>
+            <button type="submit" class="submit" :class="{ 'is-loading': loading }" :disabled="loading">
               {{ loading ? '登录中…' : '登 录' }}
             </button>
           </form>
-          <div v-if="error" class="err-alert">{{ error }}</div>
+          <Transition name="alert">
+            <div v-if="error" class="err-alert">{{ error }}</div>
+          </Transition>
           <p class="foot-note">正式环境将接入学校教务账号统一登录</p>
         </div>
       </section>
@@ -94,6 +77,25 @@ const loginName = ref('')
 const password = ref('')
 const loading = ref(false)
 const error = ref('')
+
+// 产品特性列表（SVG 路径集中管理，便于统一维护图标风格）
+const features = [
+  {
+    title: '秒级自动判题',
+    desc: '提交即刻评测，编译错误与用例结果实时反馈',
+    path: 'M13 2 3 14h7l-1 8 10-12h-7l1-8z'
+  },
+  {
+    title: '安全沙箱运行',
+    desc: '受限环境隔离执行代码，资源与网络严格管控',
+    path: 'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z'
+  },
+  {
+    title: '成绩分析导出',
+    desc: '多维统计班级表现，一键导出 XLSX / CSV',
+    path: 'M4 20V10M10 20V4M16 20v-7M22 20H2'
+  }
+]
 
 async function submit() {
   loading.value = true
@@ -136,7 +138,7 @@ async function submit() {
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
-  padding: 20px 24px;
+  padding: var(--space-5) 24px;
 }
 
 .brand { display: flex; align-items: center; gap: 10px; }
@@ -148,14 +150,14 @@ async function submit() {
   color: #fff;
   display: grid;
   place-items: center;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 800;
   letter-spacing: -0.02em;
   box-shadow: 0 4px 10px rgba(37, 99, 235, 0.32);
 }
 .brand-name { font-weight: 800; font-size: 17px; letter-spacing: -0.01em; }
 .brand-tag {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
   background: #f1f5f9;
   border: 1px solid var(--border);
@@ -164,7 +166,7 @@ async function submit() {
 }
 
 .top-links { display: flex; gap: 26px; }
-.top-links a { color: var(--muted); font-weight: 500; font-size: 14px; }
+.top-links a { color: var(--muted); font-weight: 500; font-size: var(--fs-base); }
 .top-links a:hover { color: var(--text); }
 
 .landing-body {
@@ -176,7 +178,7 @@ async function submit() {
   max-width: 1120px;
   width: 100%;
   margin: 0 auto;
-  padding: 16px 24px 40px;
+  padding: var(--space-4) 24px 40px;
 }
 
 .badge {
@@ -226,9 +228,9 @@ async function submit() {
 .f-icon svg { width: 19px; height: 19px; }
 .f-text { display: flex; flex-direction: column; line-height: 1.5; }
 .f-text strong { font-size: 14.5px; }
-.f-text span { font-size: 13px; color: var(--muted); }
+.f-text span { font-size: var(--fs-sm); color: var(--muted); }
 
-.langs { margin: 30px 0 0; font-size: 13px; color: var(--muted); letter-spacing: 0.02em; }
+.langs { margin: 30px 0 0; font-size: var(--fs-sm); color: var(--muted); letter-spacing: 0.02em; }
 
 .login-side { display: flex; justify-content: center; }
 .login-card {
@@ -253,44 +255,41 @@ async function submit() {
 }
 
 .card-title { margin: 0 0 4px; font-size: 21px; }
-.card-sub { margin: 0 0 22px; font-size: 13px; }
+.card-sub { margin: 0 0 22px; font-size: var(--fs-sm); }
 
-form { display: flex; flex-direction: column; gap: 16px; }
+form { display: flex; flex-direction: column; gap: var(--space-4); }
 form label { display: flex; flex-direction: column; gap: 6px; }
-form label span { font-size: 13px; font-weight: 600; }
+form label span { font-size: var(--fs-sm); font-weight: 600; }
 form input { width: 100%; padding: 10px 13px; }
 
 .submit {
   width: 100%;
   padding: 11px;
-  font-size: 15px;
+  font-size: var(--fs-md);
   margin-top: 6px;
   border-radius: 10px;
 }
 
-.spinner {
-  width: 14px;
-  height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.45);
-  border-top-color: #fff;
-  border-radius: 50%;
-  display: inline-block;
-  animation: spin 0.7s linear infinite;
+/* 错误提示：滑入淡出，避免布局突兀跳变 */
+.alert-enter-active,
+.alert-leave-active {
+  transition: opacity var(--dur-base) var(--ease-out), transform var(--dur-base) var(--ease-out);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+.alert-enter-from,
+.alert-leave-to { opacity: 0; transform: translateY(-6px); }
 
 .err-alert {
   margin-top: 14px;
   background: var(--danger-soft);
   color: var(--danger);
-  border: 1px solid #fecaca;
+  border: 1px solid color-mix(in srgb, var(--danger) 32%, transparent);
   border-radius: 10px;
   padding: 10px 13px;
   font-size: 13.5px;
 }
 
 .foot-note {
-  margin: 20px 0 0;
+  margin: var(--space-5) 0 0;
   padding-top: 15px;
   border-top: 1px dashed var(--border-strong);
   font-size: 12.5px;

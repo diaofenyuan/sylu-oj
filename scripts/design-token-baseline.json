@@ -1,0 +1,137 @@
+{
+  "app/web/src/App.vue": {
+    "offGridSpacing": 9,
+    "hardcodedFont": 0,
+    "hardcodedColor": 4
+  },
+  "app/web/src/components/CaseDetails.vue": {
+    "offGridSpacing": 3,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/components/ContestMode.vue": {
+    "offGridSpacing": 5,
+    "hardcodedFont": 1,
+    "hardcodedColor": 13
+  },
+  "app/web/src/components/DifficultyBadge.vue": {
+    "offGridSpacing": 2,
+    "hardcodedFont": 0,
+    "hardcodedColor": 40
+  },
+  "app/web/src/components/DiscussionZone.vue": {
+    "offGridSpacing": 15,
+    "hardcodedFont": 1,
+    "hardcodedColor": 4
+  },
+  "app/web/src/components/ErrorDiagnostics.vue": {
+    "offGridSpacing": 6,
+    "hardcodedFont": 0,
+    "hardcodedColor": 5
+  },
+  "app/web/src/components/Leaderboard.vue": {
+    "offGridSpacing": 6,
+    "hardcodedFont": 2,
+    "hardcodedColor": 11
+  },
+  "app/web/src/components/ProblemWorkbench.vue": {
+    "offGridSpacing": 32,
+    "hardcodedFont": 3,
+    "hardcodedColor": 52
+  },
+  "app/web/src/components/ProgressCard.vue": {
+    "offGridSpacing": 5,
+    "hardcodedFont": 0,
+    "hardcodedColor": 2
+  },
+  "app/web/src/components/SampleCompare.vue": {
+    "offGridSpacing": 2,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/components/ShortcutHelp.vue": {
+    "offGridSpacing": 3,
+    "hardcodedFont": 1,
+    "hardcodedColor": 2
+  },
+  "app/web/src/components/TemplatePicker.vue": {
+    "offGridSpacing": 3,
+    "hardcodedFont": 1,
+    "hardcodedColor": 2
+  },
+  "app/web/src/components/ui/EmptyState.vue": {
+    "offGridSpacing": 2,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/components/ui/ErrorState.vue": {
+    "offGridSpacing": 4,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/components/ui/SkeletonList.vue": {
+    "offGridSpacing": 1,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/components/ui/ToastHost.vue": {
+    "offGridSpacing": 4,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/style.css": {
+    "offGridSpacing": 10,
+    "hardcodedFont": 1,
+    "hardcodedColor": 4
+  },
+  "app/web/src/styles/motion.css": {
+    "offGridSpacing": 2,
+    "hardcodedFont": 0,
+    "hardcodedColor": 3
+  },
+  "app/web/src/views/admin/AdminHome.vue": {
+    "offGridSpacing": 12,
+    "hardcodedFont": 0,
+    "hardcodedColor": 3
+  },
+  "app/web/src/views/Login.vue": {
+    "offGridSpacing": 21,
+    "hardcodedFont": 2,
+    "hardcodedColor": 10
+  },
+  "app/web/src/views/student/StudentAssignment.vue": {
+    "offGridSpacing": 1,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/views/student/StudentHome.vue": {
+    "offGridSpacing": 2,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/views/teacher/AnalyticsEnhanced.vue": {
+    "offGridSpacing": 8,
+    "hardcodedFont": 2,
+    "hardcodedColor": 20
+  },
+  "app/web/src/views/teacher/AssignmentEditor.vue": {
+    "offGridSpacing": 5,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/views/teacher/AssignmentsManage.vue": {
+    "offGridSpacing": 6,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  },
+  "app/web/src/views/teacher/Classes.vue": {
+    "offGridSpacing": 1,
+    "hardcodedFont": 0,
+    "hardcodedColor": 3
+  },
+  "app/web/src/views/teacher/ProblemBank.vue": {
+    "offGridSpacing": 1,
+    "hardcodedFont": 0,
+    "hardcodedColor": 0
+  }
+}

@@ -1,11 +1,11 @@
 <template>
   <div>
-    <div class="page-head">
+    <div class="page-head" v-reveal>
       <h2>组卷与发布</h2>
       <p class="muted">从题库勾选题目、分配权重，选择班级一键发布（权重之和须恰为 100）</p>
     </div>
 
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 60 }">
       <div class="row head-row">
         <input v-model="title" placeholder="作业标题" class="grow" />
         <select v-model="mode">
@@ -23,7 +23,7 @@
       <p v-if="draftId" class="muted draft-hint">正在编辑试卷 #{{ draftId }}（{{ statusLabel(draftStatus) }}），修改权重后需重新保存</p>
     </div>
 
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 120 }">
       <h3>1. 选择题目</h3>
       <div class="row pick-bar">
         <select v-model="pickClassId" @change="onPickClass">
@@ -58,7 +58,7 @@
       <div v-else class="empty">选择班级与题库后展示题目列表</div>
     </div>
 
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 180 }">
       <div class="row section-row">
         <h3>2. 权重分配</h3>
         <div class="spacer"></div>
@@ -77,7 +77,7 @@
       <div v-else class="empty">尚未选择题目</div>
     </div>
 
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 240 }">
       <h3>3. 发布到班级</h3>
       <div class="row pick-bar">
         <select v-model="targetPick">
@@ -117,14 +117,16 @@
       </div>
     </div>
 
-    <div v-if="msg" class="ok-banner">{{ msg }}</div>
-    <div v-if="errMsg" class="err-banner">{{ errMsg }}</div>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { api } from '../../api'
+import { describeError } from '../../composables/useAsyncData'
+import { useToast } from '../../composables/useToast'
+
+const toast = useToast()
 
 const title = ref('')
 const mode = ref('HOMEWORK')
@@ -147,8 +149,7 @@ const targetPick = ref('')
 const uniformPublishAt = ref('')
 const uniformDeadline = ref('')
 
-const msg = ref('')
-const errMsg = ref('')
+// 提示统一走全局 Toast，不再维护本地提示条状态
 
 const pickedIds = computed(() => new Set(picked.value.map(p => p.id)))
 const targetClassIds = computed(() => new Set(targets.value.map(t => t.teachingClassId)))
@@ -177,18 +178,15 @@ onMounted(async () => {
     classes.value = cls
     drafts.value = list
   } catch (e) {
-    errMsg.value = e.message
+    toast.error(describeError(e))
   }
 })
 
 function notify(text) {
-  msg.value = text
-  errMsg.value = ''
-  setTimeout(() => { if (msg.value === text) msg.value = '' }, 5000)
+  toast.success(text)
 }
 function fail(e) {
-  errMsg.value = e.message
-  msg.value = ''
+  toast.error(describeError(e))
 }
 
 async function onPickClass() {
@@ -381,49 +379,31 @@ function sliceTime(v) { return v ? String(v).slice(0, 16) : '' }
 .head-row input { min-width: 260px; }
 .grow { flex: 1; min-width: 220px; }
 .grow-draft { max-width: 320px; }
-.draft-hint { margin: 6px 0 0; font-size: 13px; }
+.draft-hint { margin: 6px 0 0; font-size: var(--fs-sm); }
 .pick-bar { margin-bottom: 14px; }
 .pick-list { max-height: 380px; overflow-y: auto; border: 1px solid var(--border); border-radius: 10px; }
 .pick-list table { margin-bottom: 0; border: none; box-shadow: none; }
 .pick-list tr.picked td { background: var(--accent-soft); }
-.mono { font-family: Consolas, monospace; font-size: 13px; }
-.section-row { margin-bottom: 12px; }
+.mono { font-family: Consolas, monospace; font-size: var(--fs-sm); }
+.section-row { margin-bottom: var(--space-3); }
 .section-row h3 { margin: 0; }
 .weight { font-size: 13.5px; }
 .weight.ok { color: var(--ok); }
 .weight.bad { color: var(--danger); }
-.slim-btn { padding: 5px 12px; font-size: 13px; }
-.picked-summary { display: flex; flex-wrap: wrap; gap: 8px; }
+.slim-btn { padding: 5px 12px; font-size: var(--fs-sm); }
+.picked-summary { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 .chip-x {
   background: none;
   border: none;
   box-shadow: none;
   color: inherit;
   padding: 0 0 0 4px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   line-height: 1;
   cursor: pointer;
 }
-.chip-x:hover { background: none; color: var(--danger); }
-.action-row { margin-top: 16px; }
+.chip-x:hover { background: none; color: var(--danger); transform: none; box-shadow: none; }
+.action-row { margin-top: var(--space-4); }
 .uniform-bar { align-items: center; flex-wrap: wrap; }
 input[type="datetime-local"] { padding: 7px 10px; }
-.ok-banner {
-  background: var(--ok-soft);
-  color: var(--ok);
-  border: 1px solid #bbe7d4;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  margin-top: 4px;
-}
-.err-banner {
-  background: var(--danger-soft);
-  color: var(--danger);
-  border: 1px solid #fecaca;
-  border-radius: 10px;
-  padding: 10px 14px;
-  font-size: 13.5px;
-  margin-top: 4px;
-}
 </style>

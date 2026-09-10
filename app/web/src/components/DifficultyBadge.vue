@@ -82,10 +82,10 @@ const difficultyText = computed(() => config.value.text)
   gap: 6px;
   padding: 6px 12px;
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   border: 1px solid;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
 }
 
 .difficulty-badge:hover {
@@ -100,9 +100,9 @@ const difficultyText = computed(() => config.value.text)
 .difficulty-stats {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-left: 8px;
-  padding-left: 8px;
+  gap: var(--space-1);
+  margin-left: var(--space-2);
+  padding-left: var(--space-2);
   border-left: 1px solid currentColor;
 }
 
@@ -117,11 +117,11 @@ const difficultyText = computed(() => config.value.text)
 .stat-fill {
   height: 100%;
   background: currentColor;
-  transition: width 0.3s ease;
+  transition: width var(--dur-base) var(--ease-out);
 }
 
 .stat-text {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   opacity: 0.9;
   white-space: nowrap;
 }

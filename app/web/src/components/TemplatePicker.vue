@@ -1,10 +1,12 @@
 <template>
-  <div class="template-picker" v-if="visible" @click.self="$emit('close')">
+  <AppOverlay :open="visible" placement="center" aria-label="代码模板"
+              @close="$emit('close')">
     <div class="picker-content">
       <div class="picker-header">
         <Icon icon="mdi:code-braces" />
         <h3>代码模板</h3>
-        <button class="close-btn" @click="$emit('close')">
+        <button type="button" class="close-btn" aria-label="关闭"
+                @click="$emit('close')">
           <Icon icon="mdi:close" />
         </button>
       </div>
@@ -75,7 +77,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </AppOverlay>
 </template>
 
 <script setup>
@@ -107,20 +109,6 @@ function insertSnippet(snippet) {
 </script>
 
 <style scoped>
-.template-picker {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
 
 .picker-content {
   background: var(--panel);
@@ -137,15 +125,15 @@ function insertSnippet(snippet) {
 .picker-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 20px 24px;
+  gap: var(--space-3);
+  padding: var(--space-5) 24px;
   border-bottom: 1px solid var(--border);
 }
 
 .picker-header h3 {
   flex: 1;
   margin: 0;
-  font-size: 18px;
+  font-size: var(--fs-xl);
 }
 
 .close-btn {
@@ -162,13 +150,13 @@ function insertSnippet(snippet) {
 .picker-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: var(--space-5) 24px;
 }
 
 .tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
 }
 
 .tab-btn {
@@ -194,10 +182,10 @@ function insertSnippet(snippet) {
   background: var(--panel-2);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 16px;
+  padding: var(--space-4);
   cursor: pointer;
-  transition: all 0.15s ease;
-  margin-bottom: 12px;
+  transition: all var(--dur-fast) var(--ease-out);
+  margin-bottom: var(--space-3);
 }
 
 .template-card:hover, .snippet-card:hover {
@@ -210,12 +198,12 @@ function insertSnippet(snippet) {
 .card-header, .snippet-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 12px;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
 }
 
 .card-icon {
-  font-size: 32px;
+  font-size: var(--fs-4xl);
   color: var(--accent);
 }
 
@@ -227,7 +215,7 @@ function insertSnippet(snippet) {
   border-radius: 8px;
   display: grid;
   place-items: center;
-  font-size: 20px;
+  font-size: var(--fs-2xl);
 }
 
 .card-info, .snippet-info {
@@ -236,13 +224,13 @@ function insertSnippet(snippet) {
 
 .card-info h4, .snippet-info h4 {
   margin: 0 0 4px;
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--text);
 }
 
 .card-info p, .snippet-info p {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -250,15 +238,15 @@ function insertSnippet(snippet) {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 12px;
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
   overflow: hidden;
 }
 
 .card-preview pre, .snippet-preview pre {
   margin: 0;
   font-family: 'Cascadia Code', 'JetBrains Mono', monospace;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--text);
   white-space: pre-wrap;
   word-break: break-all;
@@ -269,20 +257,20 @@ function insertSnippet(snippet) {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px;
+  padding: var(--space-2);
   background: var(--accent);
   color: #fff;
   border-radius: 6px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 .empty-snippets {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
-  padding: 40px 20px;
+  gap: var(--space-3);
+  padding: var(--space-8) 20px;
   color: var(--muted);
 }
 

@@ -197,7 +197,7 @@ const timeRemaining = computed(() => {
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 20px;
+  padding: var(--space-5);
   box-shadow: var(--shadow-sm);
 }
 
@@ -205,18 +205,18 @@ const timeRemaining = computed(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 24px;
+  margin-bottom: var(--space-6);
 }
 
 .header-info h3 {
   margin: 0 0 4px;
-  font-size: 18px;
+  font-size: var(--fs-xl);
   color: var(--text);
 }
 
 .subtitle {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -229,7 +229,7 @@ const timeRemaining = computed(() => {
 .progress-ring {
   transform: rotate(-90deg);
   transform-origin: 50% 50%;
-  transition: stroke-dashoffset 0.6s ease;
+  transition: stroke-dashoffset var(--dur-slower) var(--ease-out);
 }
 
 .progress-text {
@@ -242,7 +242,7 @@ const timeRemaining = computed(() => {
 
 .percent {
   display: block;
-  font-size: 24px;
+  font-size: var(--fs-3xl);
   font-weight: 700;
   color: var(--text);
   line-height: 1;
@@ -250,34 +250,34 @@ const timeRemaining = computed(() => {
 
 .label {
   display: block;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--muted);
-  margin-top: 4px;
+  margin-top: var(--space-1);
 }
 
 .progress-body {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-5);
 }
 
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .stat-item {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px;
+  padding: var(--space-3);
   background: var(--panel-2);
   border-radius: 8px;
 }
 
 .stat-icon {
-  font-size: 24px;
+  font-size: var(--fs-3xl);
 }
 
 .stat-icon.success { color: var(--ok); }
@@ -291,14 +291,14 @@ const timeRemaining = computed(() => {
 }
 
 .stat-value {
-  font-size: 18px;
+  font-size: var(--fs-xl);
   font-weight: 700;
   color: var(--text);
   line-height: 1;
 }
 
 .stat-label {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--muted);
   margin-top: 2px;
 }
@@ -320,22 +320,22 @@ const timeRemaining = computed(() => {
 .progress-bar-fill {
   position: absolute;
   height: 100%;
-  transition: width 0.6s ease, left 0.6s ease;
+  transition: width var(--dur-slower) var(--ease-out), left var(--dur-slower) var(--ease-out);
 }
 
 .completed-fill {
-  background: linear-gradient(90deg, #10b981, #059669);
+  background: linear-gradient(90deg, var(--chart-ok), color-mix(in srgb, var(--chart-ok) 80%, #000));
   left: 0;
 }
 
 .progress-fill {
-  background: linear-gradient(90deg, #3b82f6, #2563eb);
+  background: linear-gradient(90deg, var(--chart-info), color-mix(in srgb, var(--chart-info) 80%, #000));
 }
 
 .progress-bar-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--muted);
 }
 
@@ -347,7 +347,7 @@ const timeRemaining = computed(() => {
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--accent);
 }
 
@@ -369,7 +369,7 @@ const timeRemaining = computed(() => {
 @media (max-width: 768px) {
   .progress-header {
     flex-direction: column;
-    gap: 20px;
+    gap: var(--space-5);
     text-align: center;
   }
   

@@ -1,12 +1,14 @@
 <template>
-  <div class="leaderboard-modal" v-if="visible" @click.self="$emit('close')">
+  <AppOverlay :open="visible" placement="center" aria-label="性能排行榜"
+              @close="$emit('close')">
     <div class="modal-content">
       <div class="modal-header">
         <div class="header-left">
           <Icon icon="mdi:trophy" class="trophy-icon" />
           <h3>性能排行榜</h3>
         </div>
-        <button class="close-btn" @click="$emit('close')">
+        <button type="button" class="close-btn" aria-label="关闭"
+                @click="$emit('close')">
           <Icon icon="mdi:close" />
         </button>
       </div>
@@ -90,7 +92,7 @@
         </p>
       </div>
     </div>
-  </div>
+  </AppOverlay>
 </template>
 
 <script setup>
@@ -168,20 +170,6 @@ function formatDate(dateStr) {
 </script>
 
 <style scoped>
-.leaderboard-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 20px;
-}
 
 .modal-content {
   background: var(--panel);
@@ -199,24 +187,24 @@ function formatDate(dateStr) {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 24px;
+  padding: var(--space-5) 24px;
   border-bottom: 1px solid var(--border);
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .trophy-icon {
   font-size: 28px;
-  color: #f59e0b;
+  color: var(--chart-warn);
 }
 
 .modal-header h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: var(--fs-2xl);
   color: var(--text);
 }
 
@@ -230,7 +218,7 @@ function formatDate(dateStr) {
   border: 1px solid var(--border);
   border-radius: 8px;
   color: var(--muted);
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
 }
 
 .close-btn:hover {
@@ -241,13 +229,13 @@ function formatDate(dateStr) {
 .modal-body {
   flex: 1;
   overflow-y: auto;
-  padding: 20px 24px;
+  padding: var(--space-5) 24px;
 }
 
 .tabs {
   display: flex;
-  gap: 8px;
-  margin-bottom: 20px;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
 }
 
 .tab-btn {
@@ -262,7 +250,7 @@ function formatDate(dateStr) {
   color: var(--muted);
   border-radius: 8px;
   font-weight: 500;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
 }
 
 .tab-btn:hover {
@@ -284,7 +272,7 @@ function formatDate(dateStr) {
   justify-content: center;
   padding: 60px 20px;
   color: var(--muted);
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .loading-state svg, .error-state svg, .empty-state svg {
@@ -295,17 +283,17 @@ function formatDate(dateStr) {
 .rank-table {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .rank-header {
   display: grid;
   grid-template-columns: 80px 1fr 100px 140px 140px;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: var(--space-3);
+  padding: var(--space-3) 16px;
   background: var(--panel-2);
   border-radius: 8px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--muted);
   text-transform: uppercase;
@@ -321,13 +309,13 @@ function formatDate(dateStr) {
 .rank-item {
   display: grid;
   grid-template-columns: 80px 1fr 100px 140px 140px;
-  gap: 12px;
+  gap: var(--space-3);
   padding: 14px 16px;
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: 8px;
   align-items: center;
-  transition: all 0.15s ease;
+  transition: all var(--dur-fast) var(--ease-out);
 }
 
 .rank-item:hover {
@@ -336,8 +324,8 @@ function formatDate(dateStr) {
 }
 
 .rank-1st {
-  border-left: 3px solid #f59e0b;
-  background: linear-gradient(90deg, rgba(245, 158, 11, 0.05), var(--panel));
+  border-left: 3px solid var(--chart-warn);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--chart-warn) 5%, transparent), var(--panel));
 }
 
 .rank-2nd {
@@ -358,13 +346,13 @@ function formatDate(dateStr) {
   height: 40px;
   border-radius: 50%;
   font-weight: 700;
-  font-size: 16px;
+  font-size: var(--fs-lg);
 }
 
 .badge-gold {
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  background: linear-gradient(135deg, color-mix(in srgb, var(--chart-warn) 72%, #fff), var(--chart-warn));
   color: #fff;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--chart-warn) 40%, transparent);
 }
 
 .badge-silver {
@@ -386,11 +374,11 @@ function formatDate(dateStr) {
 
 .lang-tag {
   display: inline-block;
-  padding: 4px 10px;
+  padding: var(--space-1) 10px;
   background: var(--accent-soft);
   color: var(--accent);
   border-radius: 6px;
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
 }
 
@@ -403,12 +391,12 @@ function formatDate(dateStr) {
 }
 
 .col-date {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 .modal-footer {
-  padding: 16px 24px;
+  padding: var(--space-4) 24px;
   border-top: 1px solid var(--border);
   background: var(--panel-2);
 }
@@ -416,16 +404,16 @@ function formatDate(dateStr) {
 .footer-note {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
 @media (max-width: 768px) {
   .rank-header, .rank-item {
     grid-template-columns: 60px 1fr 80px;
-    font-size: 12px;
+    font-size: var(--fs-xs);
   }
   
   .col-perf, .col-date {

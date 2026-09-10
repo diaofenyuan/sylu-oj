@@ -1,34 +1,56 @@
 <template>
   <div class="analytics-enhanced">
-    <div class="page-head">
+    <div class="page-head" v-reveal>
       <h2>成绩分析（目标班级 #{{ targetId }}）</h2>
       <p class="muted">班级表现多维统计与成绩导出</p>
     </div>
 
+    <!-- 骨架结构逐块对齐真实内容（指标卡 / 三类图表 / 排名表 / 导出表单），
+         加载完成时页面高度基本不变，避免内容"撑开"造成的突兀感 -->
+    <template v-if="loading">
+      <SkeletonStats :count="4" />
+      <SkeletonChart variant="rows" :buckets="5" />
+      <SkeletonChart variant="bars" :height="150" :buckets="5" />
+      <SkeletonChart variant="rows" :buckets="3" />
+      <div class="card sk-panel">
+        <span class="skeleton sk-title"></span>
+        <SkeletonTable :rows="4" :cols="7" />
+      </div>
+      <div class="card sk-panel">
+        <span class="skeleton sk-title"></span>
+        <div class="sk-fields">
+          <span v-for="n in 4" :key="n" class="skeleton sk-field"></span>
+        </div>
+      </div>
+    </template>
+
+    <ErrorState v-else-if="error" :detail="error" :retrying="loading" @retry="load" />
+
+    <template v-else>
     <!-- 概览卡片 -->
     <div class="overview-grid">
-      <div class="stat-card">
+      <div class="stat-card" v-reveal="{ delay: 40 }">
         <Icon icon="mdi:account-group" class="stat-icon" />
         <div class="stat-content">
           <div class="stat-value">{{ rows.length }}</div>
           <div class="stat-label">总学生数</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" v-reveal="{ delay: 100 }">
         <Icon icon="mdi:chart-line" class="stat-icon success" />
         <div class="stat-content">
           <div class="stat-value">{{ avgScore.toFixed(1) }}</div>
           <div class="stat-label">平均分</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" v-reveal="{ delay: 160 }">
         <Icon icon="mdi:percent" class="stat-icon accent" />
         <div class="stat-content">
           <div class="stat-value">{{ avgPassRate.toFixed(1) }}%</div>
           <div class="stat-label">平均通过率</div>
         </div>
       </div>
-      <div class="stat-card">
+      <div class="stat-card" v-reveal="{ delay: 220 }">
         <Icon icon="mdi:file-document-multiple" class="stat-icon warn" />
         <div class="stat-content">
           <div class="stat-value">{{ totalSubmissions }}</div>
@@ -38,7 +60,7 @@
     </div>
 
     <!-- 状态分布 -->
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 120 }">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:chart-donut" />
@@ -52,9 +74,9 @@
             <span class="status-value">{{ v }} 次</span>
           </div>
           <div class="status-track">
-            <div 
-              class="status-fill" 
-              :style="{ width: (v / maxStatusCount * 100) + '%' }"
+            <div
+              class="status-fill"
+              :style="{ '--w': (v / maxStatusCount * 100) + '%' }"
               :class="'status-' + k">
             </div>
           </div>
@@ -67,7 +89,7 @@
     </div>
 
     <!-- 分数分布图 -->
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 180 }">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:chart-bar" />
@@ -77,9 +99,9 @@
       <div class="score-distribution">
         <div v-for="bucket in scoreDistribution" :key="bucket.range" class="score-bucket">
           <div class="bucket-bar">
-            <div 
-              class="bucket-fill" 
-              :style="{ height: (bucket.count / maxBucketCount * 100) + '%' }">
+            <div
+              class="bucket-fill"
+              :style="{ '--h': (bucket.count / maxBucketCount * 100) + '%' }">
             </div>
           </div>
           <div class="bucket-label">{{ bucket.range }}</div>
@@ -89,7 +111,7 @@
     </div>
 
     <!-- 提交时间热力图 -->
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 240 }">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:clock-outline" />
@@ -113,7 +135,7 @@
     </div>
 
     <!-- 学生排名表 -->
-    <div class="card">
+    <div class="card" v-reveal="{ delay: 300 }">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:podium" />
@@ -132,29 +154,41 @@
         <table>
           <thead>
             <tr>
-              <th @click="sortBy('rank')">
-                排名
-                <Icon v-if="sortField === 'rank'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+              <th :aria-sort="ariaSort('rank')">
+                <button type="button" class="th-sort" @click="sortBy('rank')">
+                  排名
+                  <Icon v-if="sortField === 'rank'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+                </button>
               </th>
-              <th @click="sortBy('studentNo')">
-                学号
-                <Icon v-if="sortField === 'studentNo'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+              <th :aria-sort="ariaSort('studentNo')">
+                <button type="button" class="th-sort" @click="sortBy('studentNo')">
+                  学号
+                  <Icon v-if="sortField === 'studentNo'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+                </button>
               </th>
-              <th @click="sortBy('name')">
-                姓名
-                <Icon v-if="sortField === 'name'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+              <th :aria-sort="ariaSort('name')">
+                <button type="button" class="th-sort" @click="sortBy('name')">
+                  姓名
+                  <Icon v-if="sortField === 'name'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+                </button>
               </th>
-              <th @click="sortBy('totalScore')">
-                总分
-                <Icon v-if="sortField === 'totalScore'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+              <th :aria-sort="ariaSort('totalScore')">
+                <button type="button" class="th-sort" @click="sortBy('totalScore')">
+                  总分
+                  <Icon v-if="sortField === 'totalScore'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+                </button>
               </th>
-              <th @click="sortBy('passRate')">
-                通过率
-                <Icon v-if="sortField === 'passRate'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+              <th :aria-sort="ariaSort('passRate')">
+                <button type="button" class="th-sort" @click="sortBy('passRate')">
+                  通过率
+                  <Icon v-if="sortField === 'passRate'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+                </button>
               </th>
-              <th @click="sortBy('submissionCount')">
-                提交次数
-                <Icon v-if="sortField === 'submissionCount'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+              <th :aria-sort="ariaSort('submissionCount')">
+                <button type="button" class="th-sort" @click="sortBy('submissionCount')">
+                  提交次数
+                  <Icon v-if="sortField === 'submissionCount'" :icon="sortOrder === 'asc' ? 'mdi:arrow-up' : 'mdi:arrow-down'" />
+                </button>
               </th>
               <th>状态分布</th>
             </tr>
@@ -175,7 +209,7 @@
               <td>
                 <div class="progress-cell">
                   <div class="mini-progress">
-                    <div class="mini-fill" :style="{ width: r.passRate + '%' }"></div>
+                    <div class="mini-fill" :style="{ '--w': r.passRate + '%' }"></div>
                   </div>
                   <span>{{ r.passRate }}%</span>
                 </div>
@@ -194,7 +228,7 @@
     </div>
 
     <!-- 导出卡片 -->
-    <div class="card export-card">
+    <div class="card export-card" v-reveal="{ delay: 360 }">
       <div class="card-header">
         <h3>
           <Icon icon="mdi:download" />
@@ -233,18 +267,29 @@
         导出状态：{{ exportStatus }}
       </p>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { api } from '../../api'
+import { useAsyncData, describeError } from '../../composables/useAsyncData'
+import { useToast } from '../../composables/useToast'
 
 const route = useRoute()
 const targetId = route.params.targetId
-const rows = ref([])
-const classDist = ref({})
+const toast = useToast()
+
+// 明细与分布来自同一接口，合并为一次加载以保证 loading 状态不分裂
+const { data: analytics, loading, error, load } = useAsyncData(async () => {
+  const res = await api(`/teacher/analytics/targets/${targetId}`)
+  return { rows: res.rows || [], dist: res.classStatusDistribution || {} }
+})
+
+const rows = computed(() => analytics.value?.rows ?? [])
+const classDist = computed(() => analytics.value?.dist ?? {})
 const format = ref('XLSX')
 const studentNo = ref('')
 const nameKeyword = ref('')
@@ -352,6 +397,15 @@ function sortBy(field) {
   }
 }
 
+/**
+ * 供 th 的 aria-sort 使用，向读屏软件播报当前排序字段与方向。
+ * 未参与排序的列返回 none，避免读屏把所有列都朗读为可排序状态。
+ */
+function ariaSort(field) {
+  if (sortField.value !== field) return 'none'
+  return sortOrder.value === 'asc' ? 'ascending' : 'descending'
+}
+
 function getRankClass(rank) {
   if (rank === 1) return 'rank-gold'
   if (rank === 2) return 'rank-silver'
@@ -366,33 +420,38 @@ function getRankIcon(rank) {
   return ''
 }
 
-onMounted(async () => {
-  const data = await api(`/teacher/analytics/targets/${targetId}`)
-  rows.value = data.rows
-  classDist.value = data.classStatusDistribution
-})
+// 数据加载由 useAsyncData 在 setup 阶段自动发起
 
 async function exportGrades() {
-  const res = await api('/teacher/exports', {
-    method: 'POST',
-    body: {
-      assignmentTargetId: Number(targetId), format: format.value,
-      filterStudentNo: studentNo.value || null, filterNameKeyword: nameKeyword.value || null
-    }
-  })
-  exportId = res.taskId
-  exportStatus.value = res.status
-  pollStatus()
+  try {
+    const res = await api('/teacher/exports', {
+      method: 'POST',
+      body: {
+        assignmentTargetId: Number(targetId), format: format.value,
+        filterStudentNo: studentNo.value || null, filterNameKeyword: nameKeyword.value || null
+      }
+    })
+    exportId = res.taskId
+    exportStatus.value = res.status
+    pollStatus()
+  } catch (e) {
+    toast.error(describeError(e))
+  }
 }
 
 async function pollStatus() {
-  const res = await api(`/teacher/exports/${exportId}`)
-  exportStatus.value = res.status
-  if (res.status === 'READY') {
-    const t = await api(`/teacher/exports/${exportId}/download-token`, { method: 'POST' })
-    downloadToken.value = t.token
-  } else if (res.status === 'QUEUED' || res.status === 'GENERATING') {
-    setTimeout(pollStatus, 1000)
+  try {
+    const res = await api(`/teacher/exports/${exportId}`)
+    exportStatus.value = res.status
+    if (res.status === 'READY') {
+      const t = await api(`/teacher/exports/${exportId}/download-token`, { method: 'POST' })
+      downloadToken.value = t.token
+    } else if (res.status === 'QUEUED' || res.status === 'GENERATING') {
+      setTimeout(pollStatus, 1000)
+    }
+  } catch (e) {
+    // 轮询失败不阻塞页面，仅提示并终止本次轮询
+    toast.error(describeError(e))
   }
 }
 
@@ -406,26 +465,27 @@ function download() {
 .analytics-enhanced {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: var(--space-5);
 }
 
 /* 概览卡片网格 */
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .stat-card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: var(--space-4);
+  padding: var(--space-5);
   background: var(--panel);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
-  transition: all 0.2s ease;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out),
+              border-color var(--dur-base) var(--ease-out);
 }
 
 .stat-card:hover {
@@ -445,7 +505,7 @@ function download() {
 .stat-content {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-1);
 }
 
 .stat-value {
@@ -456,7 +516,7 @@ function download() {
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--muted);
 }
 
@@ -465,19 +525,19 @@ function download() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-5);
 }
 
 .card-header h3 {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
   margin: 0;
 }
 
 .header-actions {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .search-input {
@@ -488,7 +548,7 @@ function download() {
 .status-chart {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .status-bar {
@@ -500,7 +560,7 @@ function download() {
 .status-info {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: var(--fs-sm);
 }
 
 .status-label {
@@ -521,23 +581,30 @@ function download() {
 
 .status-fill {
   height: 100%;
-  transition: width 0.6s ease;
+  width: var(--w, 0%);
   border-radius: 12px;
+  /* 自左向右生长，凸显各状态量级差异 */
+  animation: bar-grow-x var(--dur-slower) var(--ease-out) both;
 }
 
-.status-AC { background: linear-gradient(90deg, #10b981, #059669); }
-.status-WA { background: linear-gradient(90deg, #ef4444, #dc2626); }
-.status-TLE { background: linear-gradient(90deg, #f59e0b, #d97706); }
-.status-MLE { background: linear-gradient(90deg, #a855f7, #9333ea); }
-.status-CE { background: linear-gradient(90deg, #eab308, #ca8a04); }
-.status-RE { background: linear-gradient(90deg, #f97316, #ea580c); }
+@keyframes bar-grow-x {
+  from { width: 0; }
+  to { width: var(--w, 0%); }
+}
+
+.status-AC { background: linear-gradient(90deg, var(--chart-ok), color-mix(in srgb, var(--chart-ok) 80%, #000)); }
+.status-WA { background: linear-gradient(90deg, var(--chart-danger), color-mix(in srgb, var(--chart-danger) 80%, #000)); }
+.status-TLE { background: linear-gradient(90deg, var(--chart-warn), color-mix(in srgb, var(--chart-warn) 80%, #000)); }
+.status-MLE { background: linear-gradient(90deg, var(--chart-purple), color-mix(in srgb, var(--chart-purple) 80%, #000)); }
+.status-CE { background: linear-gradient(90deg, var(--chart-yellow), color-mix(in srgb, var(--chart-yellow) 80%, #000)); }
+.status-RE { background: linear-gradient(90deg, var(--chart-orange), color-mix(in srgb, var(--chart-orange) 80%, #000)); }
 
 .empty-chart {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  padding: 40px;
+  gap: var(--space-2);
+  padding: var(--space-8);
   color: var(--muted);
 }
 
@@ -545,15 +612,15 @@ function download() {
 .score-distribution {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 16px;
-  padding: 20px;
+  gap: var(--space-4);
+  padding: var(--space-5);
 }
 
 .score-bucket {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .bucket-bar {
@@ -568,19 +635,26 @@ function download() {
 
 .bucket-fill {
   width: 100%;
-  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
-  transition: height 0.6s ease;
+  height: var(--h, 0%);
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
   border-radius: 4px 4px 0 0;
+  /* 数据到达后自底部生长，强化分布对比的可读性 */
+  animation: bar-grow var(--dur-slower) var(--ease-out) both;
+}
+
+@keyframes bar-grow {
+  from { height: 0; }
+  to { height: var(--h, 0%); }
 }
 
 .bucket-label {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   font-weight: 600;
   color: var(--text);
 }
 
 .bucket-count {
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   color: var(--muted);
 }
 
@@ -588,17 +662,17 @@ function download() {
 .activity-info {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  gap: var(--space-4);
 }
 
 .activity-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 16px;
+  gap: var(--space-2);
+  padding: var(--space-4);
   background: var(--panel-2);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: var(--fs-base);
 }
 
 /* 表格增强 */
@@ -607,23 +681,43 @@ function download() {
 }
 
 table th {
-  cursor: pointer;
   user-select: none;
   white-space: nowrap;
 }
 
-table th:hover {
-  background: var(--panel-2);
+/* 表头按钮：重置全局 button 的主色底，仅保留排版与交互态 */
+.th-sort {
+  width: 100%;
+  justify-content: flex-start;
+  gap: var(--space-1);
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out);
 }
+.th-sort:hover:not(:disabled) {
+  background: none;
+  box-shadow: none;
+  transform: none;
+  color: var(--accent);
+}
+.th-sort:active:not(:disabled) { transform: none; box-shadow: none; }
+.th-sort svg { width: 14px; height: 14px; }
 
 .rank-badge {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: var(--space-1);
   padding: 6px 12px;
   border-radius: 8px;
   font-weight: 600;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   background: var(--panel-2);
   border: 1px solid var(--border);
 }
@@ -647,14 +741,14 @@ table th:hover {
 }
 
 .score-badge {
-  font-size: 16px;
+  font-size: var(--fs-lg);
   color: var(--accent);
 }
 
 .progress-cell {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--space-2);
 }
 
 .mini-progress {
@@ -667,20 +761,20 @@ table th:hover {
 
 .mini-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--accent), var(--accent-dark));
-  transition: width 0.3s ease;
+  background: linear-gradient(90deg, var(--accent), var(--accent-strong));
+  animation: bar-grow-x var(--dur-slower) var(--ease-out) both;
 }
 
 .status-dist {
   display: flex;
-  gap: 4px;
+  gap: var(--space-1);
   flex-wrap: wrap;
 }
 
 .mini-chip {
   padding: 2px 6px;
   border-radius: 4px;
-  font-size: 11px;
+  font-size: var(--fs-2xs);
   font-weight: 600;
   white-space: nowrap;
 }
@@ -688,16 +782,16 @@ table th:hover {
 .chip-AC { background: var(--ok-soft); color: var(--ok); }
 .chip-WA { background: var(--danger-soft); color: var(--danger); }
 .chip-TLE { background: var(--warn-soft); color: var(--warn); }
-.chip-MLE { background: rgba(168, 85, 247, 0.1); color: #a855f7; }
-.chip-CE { background: rgba(234, 179, 8, 0.1); color: #eab308; }
-.chip-RE { background: rgba(249, 115, 22, 0.1); color: #f97316; }
+.chip-MLE { background: color-mix(in srgb, var(--chart-purple) 12%, transparent); color: var(--chart-purple); }
+.chip-CE { background: color-mix(in srgb, var(--chart-yellow) 12%, transparent); color: var(--chart-yellow); }
+.chip-RE { background: color-mix(in srgb, var(--chart-orange) 12%, transparent); color: var(--chart-orange); }
 
 /* 导出表单 */
 .export-form {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
-  margin-bottom: 16px;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
 }
 
 .form-group {
@@ -707,14 +801,14 @@ table th:hover {
 }
 
 .form-group label {
-  font-size: 13px;
+  font-size: var(--fs-sm);
   font-weight: 600;
   color: var(--text);
 }
 
 .export-actions {
   display: flex;
-  gap: 12px;
+  gap: var(--space-3);
 }
 
 .btn-primary {
@@ -737,12 +831,12 @@ table th:hover {
   display: flex;
   align-items: center;
   gap: 6px;
-  margin-top: 12px;
+  margin-top: var(--space-3);
   padding: 10px 12px;
   background: var(--accent-soft);
   border: 1px solid var(--accent);
   border-radius: 8px;
-  font-size: 13px;
+  font-size: var(--fs-sm);
   color: var(--accent);
 }
 
@@ -769,4 +863,9 @@ table th:hover {
     grid-template-columns: 1fr;
   }
 }
+
+/* 骨架内部元素：尺寸与真实内容对齐，保证加载完成时高度不突变 */
+.sk-panel .sk-title { display: block; width: 132px; height: 17px; border-radius: 6px; margin-bottom: var(--space-4); }
+.sk-fields { display: flex; gap: var(--space-3); flex-wrap: wrap; }
+.sk-field { display: block; width: 168px; height: 38px; border-radius: 10px; }
 </style>
