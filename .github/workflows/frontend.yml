@@ -1,0 +1,77 @@
+name: 前端校验
+
+# 仅在影响前端的路径发生变化时触发，避免后端/判题器改动也跑一遍浏览器测试
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/web/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend.yml'
+  pull_request:
+    paths:
+      - 'app/web/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/frontend.yml'
+  workflow_dispatch:
+
+# 同一分支的旧运行在新提交后取消，节省 runner 配额
+concurrency:
+  group: frontend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: 构建与 UI 回归
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 准备 Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/web/package-lock.json
+
+      - name: 安装仓库根依赖（Playwright 与图像比对工具）
+        run: npm ci
+
+      - name: 安装 Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: 安装前端依赖
+        run: npm ci --prefix app/web
+
+      # 前端单元测试（node --test）
+      - name: 前端单元测试
+        run: npm run test:web
+
+      # 设计令牌棘轮：硬编码间距/字号/颜色只允许减少，不允许增加
+      - name: 设计令牌守卫
+        run: npm run check:tokens
+
+      - name: 构建前端
+        run: npm --prefix app/web run build
+
+      # 自带开发服务器编排；全程阻断外部请求以验证离线可用性
+      - name: UI 冒烟断言
+        run: npm run verify:frontend
+
+      - name: 上传截图（失败时供排查）
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-screenshots
+          path: var/shots/
+          retention-days: 7
+          if-no-files-found: ignore

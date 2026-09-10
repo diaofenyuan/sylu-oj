@@ -20,6 +20,9 @@ target/
 *.class
 
 # Node
+# Vite 开发服务器运行期生成的临时配置副本
+vite.config.js.timestamp-*.mjs
+
 node_modules/
 dist/
 *.log
